@@ -19,8 +19,11 @@ import time
 
 NUM_HOSTS_PER_AS = 3
 NUM_ASES = 4
+ATTACKER_HOSTNAME = 'attacker_host'
 
+#setLogLevel('output')
 setLogLevel('info')
+#setLogLevel('debug')
 
 parser = ArgumentParser("Configure simple BGP network in Mininet.")
 parser.add_argument('--sleep', default=3, type=int)
@@ -60,7 +63,7 @@ class Router(Switch):
 class SimpleTopo(Topo):
     """
     The Autonomous System topology is a simple straight-line topology
-    between AS1 -- AS2 -- AS3 -- AS4.
+    between AS1 -- s1 -- AS2 -- AS3 -- AS4.
     """
 
     def __init__(self):
@@ -79,20 +82,42 @@ class SimpleTopo(Topo):
         hosts = []
         for i in xrange(num_ases):
             router = 'R%d' % (i+1)
+
             for j in xrange(num_hosts_per_as):
                 hostname = 'h%d-%d' % (i+1, j+1)
+
                 host = self.addNode(hostname)
                 hosts.append(host)
+
                 self.addLink(router, host)
 
-        for i in xrange(num_ases-1):
-            print "\t", i+1, i+2
-            self.addLink('R%d' % (i+1), 'R%d' % (i+2))
+        # adding switch between R1 and R2 to topology
+        self.addLink('R2', 'R3')
+        self.addLink('R3', 'R4')
+
+        """
+        switchname = 's1'
+        switch = self.addSwitch(switchname)
+        routers.append(switch)
+        self.addLink('R1', 's1')
+        self.addLink('R2', 's1')
+
+        # adding attacker host to topology
+        attacker_hostname = ATTACKER_HOSTNAME
+
+        host = self.addNode(attacker_hostname)
+        hosts.append(host)
+
+        self.addLink(switchname, host)
+        """
 
         return
 
 
 def getIP(hostname):
+    if hostname == ATTACKER_HOSTNAME:
+        return '9.0.0.3'
+
     AS, idx = hostname.replace('h', '').split('-')
     AS = int(AS)
     ip = '%s.0.%s.1/24' % (10+AS, idx)
@@ -119,12 +144,12 @@ def main():
 
     net = Mininet(topo=SimpleTopo(), switch=Router)
     net.start()
+
     for router in net.switches:
         router.cmd("sysctl -w net.ipv4.ip_forward=1")
         router.waitOutput()
 
-    log("Waiting %d seconds for sysctl changes to take effect..."
-        % args.sleep)
+    log("Waiting %d seconds for sysctl changes to take effect..." % args.sleep)
     sleep(args.sleep)
 
     for router in net.switches:
@@ -138,9 +163,11 @@ def main():
         host.cmd("ifconfig %s-eth0 %s" % (host.name, getIP(host.name)))
         host.cmd("route add default gw %s" % (getGateway(host.name)))
 
-    #log("Starting web servers", 'yellow')
-    startWebserver(net, 'h3-1', "Default web server")
-    startWebserver(net, 'h4-1', "*** Attacker web server ***")
+    log("Starting web servers", 'yellow')
+    startWebserver(net, 'h1-1', "Server on h1-1")
+    startWebserver(net, 'h2-1', "Server on h2-1")
+    startWebserver(net, 'h3-1', "Server on h3-1")
+    startWebserver(net, 'h4-1', "Server on h4-1")
 
     CLI(net)
     net.stop()
