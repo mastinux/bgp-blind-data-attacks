@@ -20,7 +20,7 @@ parser.add_argument('--dnode',
                     help="The destination node's name (e.g., h1, h2, etc.)")
 
 FLAGS = parser.parse_args()
-node_pat = re.compile(r'.*bash ... mininet:(.*)')
+node_pat = re.compile(r'.*bash --norc -is mininet:(.*)')
 
 
 def list_nodes(do_print=False):
