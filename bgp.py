@@ -16,11 +16,11 @@ import time
 
 ASES = 4
 HOSTS_PER_AS = 3
-BRIDGE_NAME = 'b1'
+HUB_NAME = 'h1'
 ATTACKER_NAME = 'atk1'
 
-#setLogLevel('info')
-setLogLevel('debug')
+setLogLevel('info')
+#setLogLevel('debug')
 
 parser = ArgumentParser("Configure simple BGP network in Mininet.")
 parser.add_argument('--sleep', default=3, type=int)
@@ -86,18 +86,17 @@ class SimpleTopo(Topo):
 				self.addLink(router, host)
 
 		for i in xrange(num_ases-2):
-			log('adding link R%s-R%s' % (i+2, i+3))
 			self.addLink('R%d' % (i+2), 'R%d' % (i+3))
 
 		# adding bridge between R1 and R2
-		self.addSwitch(BRIDGE_NAME, cls = OVSBridge)
-		self.addLink(BRIDGE_NAME, 'R1')
-		self.addLink(BRIDGE_NAME, 'R2')
+		self.addSwitch(HUB_NAME, cls=OVSBridge)
+		self.addLink(HUB_NAME, 'R1')
+		self.addLink(HUB_NAME, 'R2')
 
 		# adding attacker on bridge
 		attacker = self.addNode(ATTACKER_NAME)
 		hosts.append(attacker)
-		self.addLink(BRIDGE_NAME, ATTACKER_NAME)
+		self.addLink(HUB_NAME, ATTACKER_NAME)
 
 		return
 
@@ -138,14 +137,15 @@ def main():
 	net.start()
 
 	for router in net.switches:
-		router.cmd("sysctl -w net.ipv4.ip_forward=1")
-		router.waitOutput()
+		if router.name != HUB_NAME:
+			router.cmd("sysctl -w net.ipv4.ip_forward=1")
+			router.waitOutput()
 
 	log("Waiting %d seconds for sysctl changes to take effect..." % args.sleep)
 	sleep(args.sleep)
 
 	for router in net.switches:
-		if router.name != BRIDGE_NAME:
+		if router.name != HUB_NAME:
 			router.cmd("/usr/lib/quagga/zebra -f conf/zebra-%s.conf -d -i /tmp/zebra-%s.pid > logs/%s-zebra-stdout 2>&1" % (router.name, router.name, router.name))
 			router.waitOutput()
 			router.cmd("/usr/lib/quagga/bgpd -f conf/bgpd-%s.conf -d -i /tmp/bgp-%s.pid > logs/%s-bgpd-stdout 2>&1" % (router.name, router.name, router.name), shell=True)
@@ -153,8 +153,11 @@ def main():
 			log("Starting zebra and bgpd on %s" % router.name)
 
 	for host in net.hosts:
+		host.setIP(getIP(host.name))
 		host.cmd("ifconfig %s-eth0 %s" % (host.name, getIP(host.name)))
+
 		if host.name != ATTACKER_NAME:
+			host.setDefaultRoute(getGateway(host.name))
 			host.cmd("route add default gw %s" % (getGateway(host.name)))
 
 	for i in xrange(ASES):
