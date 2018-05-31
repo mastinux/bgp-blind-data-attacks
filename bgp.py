@@ -5,7 +5,7 @@ from mininet.net import Mininet
 from mininet.log import lg, info, setLogLevel
 from mininet.util import dumpNodeConnections, quietRun, moveIntf
 from mininet.cli import CLI
-from mininet.node import Switch, OVSKernelSwitch
+from mininet.node import Switch, OVSKernelSwitch, OVSKernelSwitch
 
 from subprocess import Popen, PIPE, check_output
 from time import sleep, time
@@ -19,9 +19,10 @@ import time
 
 ASES = 4
 HOSTS_PER_AS = 3
+BRIDGE_NAME = 'b1'
 
-setLogLevel('info')
-#setLogLevel('debug')
+#setLogLevel('info')
+setLogLevel('debug')
 
 parser = ArgumentParser("Configure simple BGP network in Mininet.")
 parser.add_argument('--sleep', default=3, type=int)
@@ -86,8 +87,14 @@ class SimpleTopo(Topo):
 				hosts.append(host)
 				self.addLink(router, host)
 
-		for i in xrange(num_ases-1):
-			self.addLink('R%d' % (i+1), 'R%d' % (i+2))
+		for i in xrange(num_ases-2):
+			log('adding link R%s-R%s' % (i+2, i+3))
+			self.addLink('R%d' % (i+2), 'R%d' % (i+3))
+
+		# adding switch between R1 and R2
+		self.addSwitch(BRIDGE_NAME, cls = OVSKernelSwitch)
+		self.addLink(BRIDGE_NAME, 'R1')
+		self.addLink(BRIDGE_NAME, 'R2')
 
 		return
 
@@ -132,11 +139,12 @@ def main():
 	sleep(args.sleep)
 
 	for router in net.switches:
-		router.cmd("/usr/lib/quagga/zebra -f conf/zebra-%s.conf -d -i /tmp/zebra-%s.pid > logs/%s-zebra-stdout 2>&1" % (router.name, router.name, router.name))
-		router.waitOutput()
-		router.cmd("/usr/lib/quagga/bgpd -f conf/bgpd-%s.conf -d -i /tmp/bgp-%s.pid > logs/%s-bgpd-stdout 2>&1" % (router.name, router.name, router.name), shell=True)
-		router.waitOutput()
-		log("Starting zebra and bgpd on %s" % router.name)
+		if router.name != BRIDGE_NAME:
+			router.cmd("/usr/lib/quagga/zebra -f conf/zebra-%s.conf -d -i /tmp/zebra-%s.pid > logs/%s-zebra-stdout 2>&1" % (router.name, router.name, router.name))
+			router.waitOutput()
+			router.cmd("/usr/lib/quagga/bgpd -f conf/bgpd-%s.conf -d -i /tmp/bgp-%s.pid > logs/%s-bgpd-stdout 2>&1" % (router.name, router.name, router.name), shell=True)
+			router.waitOutput()
+			log("Starting zebra and bgpd on %s" % router.name)
 
 	for host in net.hosts:
 		host.cmd("ifconfig %s-eth0 %s" % (host.name, getIP(host.name)))
