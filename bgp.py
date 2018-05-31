@@ -1,17 +1,14 @@
 #!/usr/bin/env python
-
 from mininet.topo import Topo
 from mininet.net import Mininet
 from mininet.log import lg, info, setLogLevel
 from mininet.util import dumpNodeConnections, quietRun, moveIntf
 from mininet.cli import CLI
-from mininet.node import Switch, OVSKernelSwitch, OVSKernelSwitch
-
+from mininet.node import Switch, OVSBridge
 from subprocess import Popen, PIPE, check_output
 from time import sleep, time
 from multiprocessing import Process
 from argparse import ArgumentParser
-
 import sys
 import os
 import termcolor as T
@@ -20,6 +17,7 @@ import time
 ASES = 4
 HOSTS_PER_AS = 3
 BRIDGE_NAME = 'b1'
+ATTACKER_NAME = 'atk1'
 
 #setLogLevel('info')
 setLogLevel('debug')
@@ -91,15 +89,23 @@ class SimpleTopo(Topo):
 			log('adding link R%s-R%s' % (i+2, i+3))
 			self.addLink('R%d' % (i+2), 'R%d' % (i+3))
 
-		# adding switch between R1 and R2
-		self.addSwitch(BRIDGE_NAME, cls = OVSKernelSwitch)
+		# adding bridge between R1 and R2
+		self.addSwitch(BRIDGE_NAME, cls = OVSBridge)
 		self.addLink(BRIDGE_NAME, 'R1')
 		self.addLink(BRIDGE_NAME, 'R2')
+
+		# adding attacker on bridge
+		attacker = self.addNode(ATTACKER_NAME)
+		hosts.append(attacker)
+		self.addLink(BRIDGE_NAME, ATTACKER_NAME)
 
 		return
 
 
 def getIP(hostname):
+	if hostname == ATTACKER_NAME:
+		return '9.0.0.3'
+
 	AS, idx = hostname.replace('h', '').split('-')
 	AS = int(AS)
 
@@ -148,7 +154,8 @@ def main():
 
 	for host in net.hosts:
 		host.cmd("ifconfig %s-eth0 %s" % (host.name, getIP(host.name)))
-		host.cmd("route add default gw %s" % (getGateway(host.name)))
+		if host.name != ATTACKER_NAME:
+			host.cmd("route add default gw %s" % (getGateway(host.name)))
 
 	for i in xrange(ASES):
 		log("Starting web server on h%s-1" % (i+1), 'yellow')

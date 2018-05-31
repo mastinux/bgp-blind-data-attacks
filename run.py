@@ -14,6 +14,7 @@ parser.add_argument('--list', action="store_true", default=False,
 parser.add_argument('--cmd', default='ifconfig',
                     nargs="+",
                     help="Command to run inside node.")
+
 parser.add_argument('--snode',
                     help="The source node's name (e.g., h1, h2, etc.)")
 parser.add_argument('--dnode',
