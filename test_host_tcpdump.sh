@@ -1,10 +1,10 @@
 #!/bin/bash
 
-node="atk1"
+node="test1"
 bold=`tput bold`
 normal=`tput sgr0`
 
-sudo python run.py --node $node --cmd "tcpdump -i atk1-eth0 -l"
+sudo python run.py --node $node --cmd "tcpdump -i test1-eth0 -l"
 
 #sudo python run.py --node $node --cmd "tcpdump -i atk1-eth0 \"host 9.0.0.1 or host 9.0.0.2\""
 
