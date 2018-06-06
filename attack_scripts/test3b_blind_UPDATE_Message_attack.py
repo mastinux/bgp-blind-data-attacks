@@ -4,7 +4,7 @@
 # Used for 4-byte AS configuration
 # python ./ test3 .py ( dstPort ) ( seqNum ) ( ackNum )
 import random
-from scapy .all import *
+from scapy.all import *
 
 load_contrib ('bgp')
 

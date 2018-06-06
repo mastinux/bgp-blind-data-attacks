@@ -3,7 +3,7 @@
 # Sends BGP UPDATE packet and updates 5.5.5.0 as a routed path
 # python ./ test3 .py ( dstPort ) ( seqNum ) ( ackNum )
 import random
-from scapy .all import *
+from scapy.all import *
 
 load_contrib ('bgp')
 

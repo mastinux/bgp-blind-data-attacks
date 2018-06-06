@@ -2,7 +2,7 @@
 from mininet.topo import Topo
 from mininet.net import Mininet
 from mininet.log import lg, info, setLogLevel
-from mininet.util import dumpNodeConnections, quietRun, moveIntf
+from mininet.util import dumpNodeConnections, quietRun, moveIntf, waitListening
 from mininet.cli import CLI
 from mininet.node import Switch, OVSSwitch, Controller, RemoteController
 from subprocess import Popen, PIPE, check_output
@@ -18,9 +18,10 @@ POX = '%s/pox/pox.py' % os.environ[ 'HOME' ]
 
 ASES = 4
 HOSTS_PER_AS = 3
-HUB_NAME = 'hub1'
+HUB_NAME = 'hub'
 ATTACKER_NAME = 'atk1'
-TEST_HOST_NAME = 'test1'
+TEST_HOST_NAME = 'testhost'
+BGP_CONVERGENCE_TIME = 30
 
 setLogLevel('info')
 #setLogLevel('debug')
@@ -89,26 +90,29 @@ class SimpleTopo(Topo):
 				hosts.append(host)
 				self.addLink(router, host)
 
-		for i in xrange(num_ases-2):
-			self.addLink('R%d' % (i+2), 'R%d' % (i+3))
+		self.addLink('R3', 'R4')
 
-		# adding bridge between R1 and R2
-		self.addSwitch(HUB_NAME, cls=OVSSwitch)
+		for i in xrange(2):
+			hub_name = HUB_NAME + str(i+1)
+			host_name = TEST_HOST_NAME + str(i+1)
 
-		self.addLink(HUB_NAME, 'R1')
-		self.addLink(HUB_NAME, 'R2')
+			# adding bridge between R1 and R2
+			self.addSwitch(hub_name, cls=OVSSwitch)
+
+			self.addLink(hub_name, 'R%s' % (i+1))
+			self.addLink(hub_name, 'R%s' % (i+2))
+
+			# adding test host on bridge
+			test_host = self.addNode(host_name)
+			hosts.append(test_host)
+
+			self.addLink(hub_name, host_name)
 
 		# adding attacker on bridge
 		attacker = self.addNode(ATTACKER_NAME)
 		hosts.append(attacker)
 
-		self.addLink(HUB_NAME, ATTACKER_NAME)
-
-		# adding test host on bridge
-		test_host = self.addNode(TEST_HOST_NAME)
-		hosts.append(test_host)
-
-		self.addLink(HUB_NAME, TEST_HOST_NAME)
+		self.addLink(HUB_NAME + str(1), ATTACKER_NAME)
 
 		return
 
@@ -117,8 +121,11 @@ def getIP(hostname):
 	if hostname == ATTACKER_NAME:
 		return '9.0.0.3'
 
-	if hostname == TEST_HOST_NAME:
+	if hostname == (TEST_HOST_NAME + str(1)):
 		return '9.0.0.4'
+
+	if hostname == (TEST_HOST_NAME + str(2)):
+		return '9.0.1.3'
 
 	AS, idx = hostname.replace('h', '').split('-')
 	AS = int(AS)
@@ -146,9 +153,6 @@ def startPOXHub():
 	log("Starting POX RemoteController")
 	os.system("python %s --verbose forwarding.hub > /tmp/hub1.log 2>&1 &" % POX)
 
-	log("Waiting %d seconds for pox.py..." % args.sleep)
-	sleep(args.sleep)
-
 
 def stopPOXHub():
 	log("Stopping POX RemoteController")
@@ -172,7 +176,7 @@ def main():
 			router.cmd("sysctl -w net.ipv4.ip_forward=1")
 			router.waitOutput()
 
-	log("Waiting %d seconds for sysctl changes to take effect..." % args.sleep)
+	log("Waiting %d seconds for sysctl changes to take effect..." % args.sleep, col='yellow')
 	sleep(args.sleep)
 
 	for router in net.switches:
@@ -183,19 +187,39 @@ def main():
 			router.waitOutput()
 			log("Starting zebra and bgpd on %s" % router.name)
 
+	attacker_host = None
+
 	for host in net.hosts:
-		host.setIP(getIP(host.name))
+		# host.setIP(getIP(host.name))
 		host.cmd("ifconfig %s-eth0 %s" % (host.name, getIP(host.name)))
 
-		if host.name not in [ATTACKER_NAME, TEST_HOST_NAME]:
-			host.setDefaultRoute(getGateway(host.name))
+		if host.name != ATTACKER_NAME and TEST_HOST_NAME not in host.name:
+			# host.setDefaultRoute(getGateway(host.name))
 			host.cmd("route add default gw %s" % (getGateway(host.name)))
+
+		if host.name == ATTACKER_NAME:
+			attacker_host = host
 
 	for i in xrange(ASES):
 		log("Starting web server on h%s-1" % (i+1), 'yellow')
 		startWebserver(net, 'h%s-1' % (i+1), "Web server on h%s-1" % (i+1))
 
+	"""
+	log("Waiting %s seconds for BGP convergence" % BGP_CONVERGENCE_TIME, 'yellow')
+	sleep(BGP_CONVERGENCE_TIME)
+
+	print "destination port:"
+	dstPort = int(raw_input())
+	print "sequence number:"
+	seqNum = int(raw_input())
+	print "acknowledge number:"
+	ackNum = int(raw_input())
+
+	attacker_host.sendCmd('python attack_scripts/test1_blind_RST_attack.py %s %s %s &' % (dstPort, seqNum, ackNum))
+	"""
+
 	CLI(net)
+
 	net.stop()
 
 	stopPOXHub()

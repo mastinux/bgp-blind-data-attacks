@@ -2,7 +2,7 @@
 # TEST 2: SYN ATTACK
 # Causes a RESET of connection
 # python ./ test2 .py ( dstPort ) ( seqNum ) ( ackNum )
-from scapy .all import *
+from scapy.all import *
 
 srcIP = "100.2.3.2"
 srcPort = 179
