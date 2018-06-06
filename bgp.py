@@ -9,6 +9,7 @@ from subprocess import Popen, PIPE, check_output
 from time import sleep, time
 from multiprocessing import Process
 from argparse import ArgumentParser
+from datetime import datetime
 import sys
 import os
 import termcolor as T
@@ -18,10 +19,11 @@ POX = '%s/pox/pox.py' % os.environ[ 'HOME' ]
 
 ASES = 4
 HOSTS_PER_AS = 3
+BGP_CONVERGENCE_TIME = 50
+
 HUB_NAME = 'hub'
 ATTACKER_NAME = 'atk1'
 TEST_HOST_NAME = 'testhost'
-BGP_CONVERGENCE_TIME = 30
 
 setLogLevel('info')
 #setLogLevel('debug')
@@ -92,9 +94,13 @@ class SimpleTopo(Topo):
 
 		self.addLink('R3', 'R4')
 
+		# adding attacker to topology
+		attacker = self.addNode(ATTACKER_NAME)
+		hosts.append(attacker)
+
 		for i in xrange(2):
 			hub_name = HUB_NAME + str(i+1)
-			host_name = TEST_HOST_NAME + str(i+1)
+			# host_name = TEST_HOST_NAME + str(i+1)
 
 			# adding bridge between R1 and R2
 			self.addSwitch(hub_name, cls=OVSSwitch)
@@ -103,16 +109,12 @@ class SimpleTopo(Topo):
 			self.addLink(hub_name, 'R%s' % (i+2))
 
 			# adding test host on bridge
-			test_host = self.addNode(host_name)
-			hosts.append(test_host)
+			# test_host = self.addNode(host_name)
+			# hosts.append(test_host)
 
-			self.addLink(hub_name, host_name)
+			# self.addLink(hub_name, host_name)
 
-		# adding attacker on bridge
-		attacker = self.addNode(ATTACKER_NAME)
-		hosts.append(attacker)
-
-		self.addLink(HUB_NAME + str(1), ATTACKER_NAME)
+			self.addLink(hub_name, ATTACKER_NAME)
 
 		return
 
@@ -151,7 +153,7 @@ def startWebserver(net, hostname, text="Default web server"):
 
 def startPOXHub():
 	log("Starting POX RemoteController")
-	os.system("python %s --verbose forwarding.hub > /tmp/hub1.log 2>&1 &" % POX)
+	os.system("python %s --verbose forwarding.hub > /tmp/hub.log 2>&1 &" % POX)
 
 
 def stopPOXHub():
@@ -159,10 +161,15 @@ def stopPOXHub():
 	os.system('pgrep -f pox.py | xargs kill -9')
 
 
+def launch_attack(attacker_host):
+	log("launching attack 1", 'red')
+	attacker_host.popen("python attacker_attack_1.py > /tmp/attacker_attack_1.log 2>&1", shell=True)
+	log("attack 1 launched", 'red')
+
 def main():
-	os.system("rm -f /tmp/R*.log /tmp/bgp-R?.pid /tmp/zebra-R?.pid")
-	os.system("rm -r logs/*stdout /tmp/hub1.log /tmp/*tcpdump /tmp/attacker*")
-	os.system("mn -c >/dev/null 2>&1")
+	os.system("rm -f /tmp/R*.log /tmp/bgp-R?.pid /tmp/zebra-R?.pid 2> /dev/null")
+	os.system("rm -r logs/*stdout /tmp/hub.log /tmp/attacker_attack_* 2> /dev/null")
+	os.system("mn -c > /dev/null 2>&1")
 	os.system("killall -9 zebra bgpd > /dev/null 2>&1")
 	os.system('pgrep -f webserver.py | xargs kill -9')
 
@@ -177,11 +184,11 @@ def main():
 			router.cmd("sysctl -w net.ipv4.ip_forward=1")
 			router.waitOutput()
 
-	log("Waiting %d seconds for sysctl changes to take effect..." % args.sleep, col='yellow')
+	log("Waiting %d seconds for sysctl changes to take effect..." % args.sleep, col='cyan')
 	sleep(args.sleep)
 
 	for router in net.switches:
-		if router.name != HUB_NAME:
+		if HUB_NAME not in router.name:
 			router.cmd("/usr/lib/quagga/zebra -f conf/zebra-%s.conf -d -i /tmp/zebra-%s.pid > logs/%s-zebra-stdout 2>&1" % (router.name, router.name, router.name))
 			router.waitOutput()
 			router.cmd("/usr/lib/quagga/bgpd -f conf/bgpd-%s.conf -d -i /tmp/bgp-%s.pid > logs/%s-bgpd-stdout 2>&1" % (router.name, router.name, router.name), shell=True)
@@ -200,6 +207,8 @@ def main():
 			host.cmd("route add default gw %s" % (getGateway(host.name)))
 
 		if host.name == ATTACKER_NAME:
+			host.cmd("ifconfig %s-eth0 %s" % (host.name, '9.0.0.3'))
+			host.cmd("ifconfig %s-eth1 %s" % (host.name, '9.0.1.3'))
 			attacker_host = host
 
 		if host.name == 'h1-3':
@@ -212,13 +221,14 @@ def main():
 	# ping from h1-2 to h4-2
 	# os.system('./insider_ping.sh > /tmp/insider_ping 2>&1 &')
 
-	log("Waiting %d seconds for BGP convergence..." % BGP_CONVERGENCE_TIME, col='yellow')
+	log("Waiting %d seconds for BGP convergence..." % BGP_CONVERGENCE_TIME, 'cyan')
 	sleep(BGP_CONVERGENCE_TIME)
+	
+	#os.system('./attacker_attack_1.sh > /tmp/attacker_attack_1.log 2>&1 &')
 
-	# TODO 	on atk1 using tcp dump retrieve absolute SN and AN for R3
-	# 		then launch attack using attack_scripts/*
+	launch_attack(attacker_host)
 
-	os.system('./attacker_attack_1.sh > /tmp/attacker_attack_1.log 2>&1 &')
+	os.system('lxterminal -e \"/bin/bash -c \'tail -f /tmp/attacker_attack_1.log\' \" &')
 
 	CLI(net)
 
