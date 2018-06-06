@@ -160,7 +160,8 @@ def stopPOXHub():
 
 
 def main():
-	os.system("rm -f /tmp/R*.log /tmp/hub1.log /tmp/R*.pid logs/*stdout")
+	os.system("rm -f /tmp/R*.log /tmp/bgp-R?.pid /tmp/zebra-R?.pid")
+	os.system("rm -r logs/*stdout /tmp/hub1.log /tmp/*tcpdump /tmp/attacker*")
 	os.system("mn -c >/dev/null 2>&1")
 	os.system("killall -9 zebra bgpd > /dev/null 2>&1")
 	os.system('pgrep -f webserver.py | xargs kill -9')
@@ -188,6 +189,7 @@ def main():
 			log("Starting zebra and bgpd on %s" % router.name)
 
 	attacker_host = None
+	insider_host = None
 
 	for host in net.hosts:
 		# host.setIP(getIP(host.name))
@@ -200,23 +202,23 @@ def main():
 		if host.name == ATTACKER_NAME:
 			attacker_host = host
 
+		if host.name == 'h1-3':
+			insider_host = host
+
 	for i in xrange(ASES):
 		log("Starting web server on h%s-1" % (i+1), 'yellow')
 		startWebserver(net, 'h%s-1' % (i+1), "Web server on h%s-1" % (i+1))
 
-	"""
-	log("Waiting %s seconds for BGP convergence" % BGP_CONVERGENCE_TIME, 'yellow')
+	# ping from h1-2 to h4-2
+	# os.system('./insider_ping.sh > /tmp/insider_ping 2>&1 &')
+
+	log("Waiting %d seconds for BGP convergence..." % BGP_CONVERGENCE_TIME, col='yellow')
 	sleep(BGP_CONVERGENCE_TIME)
 
-	print "destination port:"
-	dstPort = int(raw_input())
-	print "sequence number:"
-	seqNum = int(raw_input())
-	print "acknowledge number:"
-	ackNum = int(raw_input())
+	# TODO 	on atk1 using tcp dump retrieve absolute SN and AN for R3
+	# 		then launch attack using attack_scripts/*
 
-	attacker_host.sendCmd('python attack_scripts/test1_blind_RST_attack.py %s %s %s &' % (dstPort, seqNum, ackNum))
-	"""
+	os.system('./attacker_attack_1.sh > /tmp/attacker_attack_1.log 2>&1 &')
 
 	CLI(net)
 
