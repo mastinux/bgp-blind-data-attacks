@@ -95,12 +95,12 @@ class SimpleTopo(Topo):
 		self.addLink('R3', 'R4')
 
 		# adding attacker to topology
-		attacker = self.addNode(ATTACKER_NAME)
-		hosts.append(attacker)
+		attacker_node = self.addNode(ATTACKER_NAME)
+		hosts.append(attacker_node)
 
 		for i in xrange(2):
 			hub_name = HUB_NAME + str(i+1)
-			# host_name = TEST_HOST_NAME + str(i+1)
+			host_name = TEST_HOST_NAME + str(i+1)
 
 			# adding bridge between R1 and R2
 			self.addSwitch(hub_name, cls=OVSSwitch)
@@ -109,10 +109,10 @@ class SimpleTopo(Topo):
 			self.addLink(hub_name, 'R%s' % (i+2))
 
 			# adding test host on bridge
-			# test_host = self.addNode(host_name)
-			# hosts.append(test_host)
+			test_host_node = self.addNode(host_name)
+			hosts.append(test_host_node)
 
-			# self.addLink(hub_name, host_name)
+			self.addLink(hub_name, host_name)
 
 			self.addLink(hub_name, ATTACKER_NAME)
 
@@ -179,24 +179,10 @@ def main():
 	net.addController(name='poxController', controller=RemoteController, ip='127.0.0.1', port=6633)
 	net.start()
 
-	for router in net.switches:
-		if router.name != HUB_NAME:
-			router.cmd("sysctl -w net.ipv4.ip_forward=1")
-			router.waitOutput()
-
-	log("Waiting %d seconds for sysctl changes to take effect..." % args.sleep, col='cyan')
-	sleep(args.sleep)
-
-	for router in net.switches:
-		if HUB_NAME not in router.name:
-			router.cmd("/usr/lib/quagga/zebra -f conf/zebra-%s.conf -d -i /tmp/zebra-%s.pid > logs/%s-zebra-stdout 2>&1" % (router.name, router.name, router.name))
-			router.waitOutput()
-			router.cmd("/usr/lib/quagga/bgpd -f conf/bgpd-%s.conf -d -i /tmp/bgp-%s.pid > logs/%s-bgpd-stdout 2>&1" % (router.name, router.name, router.name), shell=True)
-			router.waitOutput()
-			log("Starting zebra and bgpd on %s" % router.name)
+	# CONFIGURING HOSTS
 
 	attacker_host = None
-	insider_host = None
+	# insider_host = None
 
 	for host in net.hosts:
 		# host.setIP(getIP(host.name))
@@ -211,12 +197,33 @@ def main():
 			host.cmd("ifconfig %s-eth1 %s" % (host.name, '9.0.1.3'))
 			attacker_host = host
 
-		if host.name == 'h1-3':
-			insider_host = host
+		# if host.name == 'h1-3':
+		#	insider_host = host
+
+	os.system('./testhost1_tcpdump.sh > /tmp/testhost1_tcpdump.log 2>&1 &')
+	os.system('./testhost2_tcpdump.sh > /tmp/testhost2_tcpdump.log 2>&1 &')
 
 	for i in xrange(ASES):
 		log("Starting web server on h%s-1" % (i+1), 'yellow')
 		startWebserver(net, 'h%s-1' % (i+1), "Web server on h%s-1" % (i+1))
+
+	# CONFIGURING ROUTERS
+
+	for router in net.switches:
+		if HUB_NAME not in router.name:
+			router.cmd("sysctl -w net.ipv4.ip_forward=1")
+			router.waitOutput()
+
+	log("Waiting %d seconds for sysctl changes to take effect..." % args.sleep, col='cyan')
+	sleep(args.sleep)
+
+	for router in net.switches:
+		if HUB_NAME not in router.name:
+			router.cmd("/usr/lib/quagga/zebra -f conf/zebra-%s.conf -d -i /tmp/zebra-%s.pid > logs/%s-zebra-stdout 2>&1" % (router.name, router.name, router.name))
+			router.waitOutput()
+			router.cmd("/usr/lib/quagga/bgpd -f conf/bgpd-%s.conf -d -i /tmp/bgp-%s.pid > logs/%s-bgpd-stdout 2>&1" % (router.name, router.name, router.name), shell=True)
+			router.waitOutput()
+			log("Starting zebra and bgpd on %s" % router.name)
 
 	# ping from h1-2 to h4-2
 	# os.system('./insider_ping.sh > /tmp/insider_ping 2>&1 &')
@@ -224,13 +231,18 @@ def main():
 	log("Waiting %d seconds for BGP convergence..." % BGP_CONVERGENCE_TIME, 'cyan')
 	sleep(BGP_CONVERGENCE_TIME)
 	
-	#os.system('./attacker_attack_1.sh > /tmp/attacker_attack_1.log 2>&1 &')
+	# os.system('./attacker_attack_1.sh > /tmp/attacker_attack_1.log 2>&1 &')
 
-	launch_attack(attacker_host)
+	terminate = 2
 
-	os.system('lxterminal -e \"/bin/bash -c \'tail -f /tmp/attacker_attack_1.log\' \" &')
+	while terminate != 1:
+		launch_attack(attacker_host)
 
-	CLI(net)
+		terminate = input("Repeat attack? (yes=1, no=0): ") + 1
+
+	#os.system('lxterminal -e \"/bin/bash -c \'tail -f /tmp/attacker_attack_1.log\' \" &')
+
+	#CLI(net)
 
 	net.stop()
 

