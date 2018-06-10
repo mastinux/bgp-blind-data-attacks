@@ -9,18 +9,18 @@ from subprocess import Popen, PIPE, check_output
 from time import sleep, time
 from multiprocessing import Process
 from argparse import ArgumentParser
-from datetime import datetime
 import sys
 import os
 import termcolor as T
 import time
+import datetime
 
 POX = '%s/pox/pox.py' % os.environ[ 'HOME' ]
 
 ASES = 4
 HOSTS_PER_AS = 3
 BGP_CONVERGENCE_TIME = 50
-CAPTURING_WINDOW = 120
+CAPTURING_WINDOW = 180
 
 HUB_NAME = 'hub'
 ATTACKER_NAME = 'atk1'
@@ -226,7 +226,8 @@ def main():
 			router.waitOutput()
 			log("Starting zebra and bgpd on %s" % router.name)
 
-	log("Waiting %d seconds for BGP convergence..." % BGP_CONVERGENCE_TIME, 'cyan')
+	log("Waiting %d seconds for BGP convergence (estimated %s)..."  % \
+		(BGP_CONVERGENCE_TIME, (datetime.datetime.now()+datetime.timedelta(0, BGP_CONVERGENCE_TIME)).strftime("%H:%M:%S")), 'cyan')
 	sleep(BGP_CONVERGENCE_TIME)
 
 	count = 0
@@ -239,7 +240,8 @@ def main():
 		count = count + 1
 
 	#"""
-	log("Collecting data for %s seconds..." % CAPTURING_WINDOW, 'cyan')
+	log("Collecting data for %s seconds (estimated %s)..." % \
+		(CAPTURING_WINDOW, (datetime.datetime.now()+datetime.timedelta(0,CAPTURING_WINDOW)).strftime("%H:%M:%S")), 'cyan')
 	sleep(CAPTURING_WINDOW)
 	#"""
 

