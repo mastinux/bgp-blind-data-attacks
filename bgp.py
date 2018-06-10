@@ -20,6 +20,7 @@ POX = '%s/pox/pox.py' % os.environ[ 'HOME' ]
 ASES = 4
 HOSTS_PER_AS = 3
 BGP_CONVERGENCE_TIME = 50
+CAPTURING_WINDOW = 120
 
 HUB_NAME = 'hub'
 ATTACKER_NAME = 'atk1'
@@ -168,7 +169,7 @@ def launch_attack(attacker_host):
 
 def main():
 	os.system("rm -f /tmp/R*.log /tmp/bgp-R?.pid /tmp/zebra-R?.pid 2> /dev/null")
-	os.system("rm -r logs/*stdout /tmp/hub.log /tmp/attacker_attack_* 2> /dev/null")
+	os.system("rm -r logs/*stdout /tmp/hub.log /tmp/attacker_attack_* /tmp/testhost* 2> /dev/null")
 	os.system("mn -c > /dev/null 2>&1")
 	os.system("killall -9 zebra bgpd > /dev/null 2>&1")
 	os.system('pgrep -f webserver.py | xargs kill -9')
@@ -225,25 +226,24 @@ def main():
 			router.waitOutput()
 			log("Starting zebra and bgpd on %s" % router.name)
 
-	# ping from h1-2 to h4-2
-	# os.system('./insider_ping.sh > /tmp/insider_ping 2>&1 &')
-
 	log("Waiting %d seconds for BGP convergence..." % BGP_CONVERGENCE_TIME, 'cyan')
 	sleep(BGP_CONVERGENCE_TIME)
-	
-	# os.system('./attacker_attack_1.sh > /tmp/attacker_attack_1.log 2>&1 &')
 
-	terminate = 2
+	count = 0
 
-	while terminate != 1:
+	while count < 1:
 		launch_attack(attacker_host)
 
-		terminate = input("Repeat attack? (yes=1, no=0): ") + 1
+		#terminate = input("Repeat attack? (yes=1, no=0): ") + 1
 
-	#os.system('lxterminal -e \"/bin/bash -c \'tail -f /tmp/attacker_attack_1.log\' \" &')
+		count = count + 1
+
+	#"""
+	log("Collecting data for %s seconds..." % CAPTURING_WINDOW, 'cyan')
+	sleep(CAPTURING_WINDOW)
+	#"""
 
 	#CLI(net)
-
 	net.stop()
 
 	stopPOXHub()

