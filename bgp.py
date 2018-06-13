@@ -22,7 +22,7 @@ POX = '%s/pox/pox.py' % os.environ[ 'HOME' ]
 ASES = 4
 HOSTS_PER_AS = 3
 BGP_CONVERGENCE_TIME = 60
-CAPTURING_WINDOW = 180
+CAPTURING_WINDOW = 120
 
 HUB_NAME = 'hub'
 ATTACKER_NAME = 'atk1'

