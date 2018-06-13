@@ -164,10 +164,10 @@ def stopPOXHub():
 	os.system('pgrep -f pox.py | xargs kill -9')
 
 
-def launch_attack(attacker_host):
+def launch_attack(attacker_host, choise):
 	log("launching attack", 'red')
 
-	attacker_host.popen("python attacker_attacks.py > /tmp/attacker_attacks.log 2>&1", shell=True)
+	attacker_host.popen("python attacker_attacks.py %s > /tmp/attacker_attacks.log 2>&1" % choise, shell=True)
 	os.system('lxterminal -e "/bin/bash -c \'tail -f /tmp/attacker_attacks.log\'" &')
 
 	log("attack launched", 'red')
@@ -235,16 +235,15 @@ def main():
 		(BGP_CONVERGENCE_TIME, (datetime.datetime.now()+datetime.timedelta(0, BGP_CONVERGENCE_TIME)).strftime("%H:%M:%S")), 'cyan')
 	sleep(BGP_CONVERGENCE_TIME)
 
-	count = 0
+	choise = -1
 
-	while count < 1:
-		launch_attack(attacker_host)
+	while choise != 0:
+		choise = input("Choose the attack:\n1) blind RST attack\n2) blind SYN attack\n3) blind UPDATE attack\n0) exit\n> ")
 
-		#terminate = input("Repeat attack? (yes=1, no=0): ") + 1
+		if choise != 0:
+			launch_attack(attacker_host, choise)
 
-		count = count + 1
-
-	#"""
+	"""
 	log("Collecting data for %s seconds (estimated %s)..." % \
 		(CAPTURING_WINDOW, (datetime.datetime.now()+datetime.timedelta(0,CAPTURING_WINDOW)).strftime("%H:%M:%S")), 'cyan')
 	sleep(CAPTURING_WINDOW)

