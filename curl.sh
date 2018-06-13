@@ -9,5 +9,5 @@ while true; do
     out=`sudo python run.py --snode $snode --dnode $dnode --cmd "curl -s"`
     date=`date`
     echo $date -- $bold$out$normal
-    sleep 1
+    sleep 3
 done

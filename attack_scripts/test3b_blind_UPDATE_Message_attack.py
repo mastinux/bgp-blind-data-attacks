@@ -17,7 +17,7 @@ dstPort = int(sys.argv [1])
 seqNum = int(sys.argv [2])
 ackNum = int(sys.argv [3])
 
-paORIGIN = BGPPathAttribute(flags = 0x40 , type = 1, attr_len = 1, value = '\x00')
+paORIGIN = BGPPathAttribute(flags = 0x40, type = 1, attr_len = 1, value = '\x00')
 
 # PathAttribute [AS -SEQ (2)][ ASN# (1)][ ASN (300)]
 paAS = BGPPathAttribute(flags = 0x40, type = 2, attr_len = 6, value = '\x02\x01\x00\x00\x01\x2c') # Changed Here

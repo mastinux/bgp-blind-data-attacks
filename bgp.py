@@ -1,4 +1,11 @@
 #!/usr/bin/env python
+
+import sys
+import os
+import termcolor as T
+import time
+import datetime
+
 from mininet.topo import Topo
 from mininet.net import Mininet
 from mininet.log import lg, info, setLogLevel
@@ -9,17 +16,12 @@ from subprocess import Popen, PIPE, check_output
 from time import sleep, time
 from multiprocessing import Process
 from argparse import ArgumentParser
-import sys
-import os
-import termcolor as T
-import time
-import datetime
 
 POX = '%s/pox/pox.py' % os.environ[ 'HOME' ]
 
 ASES = 4
 HOSTS_PER_AS = 3
-BGP_CONVERGENCE_TIME = 50
+BGP_CONVERGENCE_TIME = 60
 CAPTURING_WINDOW = 180
 
 HUB_NAME = 'hub'
@@ -163,13 +165,16 @@ def stopPOXHub():
 
 
 def launch_attack(attacker_host):
-	log("launching attack 1", 'red')
-	attacker_host.popen("python attacker_attack_1.py > /tmp/attacker_attack_1.log 2>&1", shell=True)
-	log("attack 1 launched", 'red')
+	log("launching attack", 'red')
+
+	attacker_host.popen("python attacker_attacks.py > /tmp/attacker_attacks.log 2>&1", shell=True)
+	os.system('lxterminal -e "/bin/bash -c \'tail -f /tmp/attacker_attacks.log\'" &')
+
+	log("attack launched", 'red')
 
 def main():
 	os.system("rm -f /tmp/R*.log /tmp/bgp-R?.pid /tmp/zebra-R?.pid 2> /dev/null")
-	os.system("rm -r logs/*stdout /tmp/hub.log /tmp/attacker_attack_* /tmp/testhost* 2> /dev/null")
+	os.system("rm -r logs/*stdout /tmp/hub.log /tmp/attacker_attacks.log /tmp/testhost* 2> /dev/null")
 	os.system("mn -c > /dev/null 2>&1")
 	os.system("killall -9 zebra bgpd > /dev/null 2>&1")
 	os.system('pgrep -f webserver.py | xargs kill -9')
