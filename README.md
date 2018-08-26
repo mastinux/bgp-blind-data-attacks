@@ -26,9 +26,11 @@ Migrating configuration and tests from GNS3 to mininet
 
 - `cd ~/quagga-1.2.4`
 
-- `chown mininet:mininet /var/run/quagga`
+- `mkdir /var/run/quagga-1.2.4`
 
-- edit `configure` file, add `${quagga_statedir_prefix}/var/run/quagga` before all options in `QUAGGA_STATE_DIR` for loop 
+- `chown mininet:mininet /var/run/quagga-1.2.4`
+
+- edit `configure` file, add `${quagga_statedir_prefix}/var/run/quagga-1.2.4` before all options in `QUAGGA_STATE_DIR` for loop 
 
 - `./configure --enable-user=mininet --enable-group=mininet`
 

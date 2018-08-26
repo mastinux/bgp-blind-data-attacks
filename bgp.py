@@ -21,12 +21,13 @@ POX = '%s/pox/pox.py' % os.environ[ 'HOME' ]
 
 ASES = 4
 HOSTS_PER_AS = 3
-BGP_CONVERGENCE_TIME = 60
+BGP_CONVERGENCE_TIME = 0 #60
 CAPTURING_WINDOW = 120
 
 HUB_NAME = 'hub'
 ATTACKER_NAME = 'atk1'
-TEST_HOST_NAME = 'testhost'
+
+QUAGGA_STATE_DIR = '/var/run/quagga-1.2.4'
 
 setLogLevel('info')
 #setLogLevel('debug')
@@ -95,29 +96,20 @@ class SimpleTopo(Topo):
 				hosts.append(host)
 				self.addLink(router, host)
 
+		self.addLink('R2', 'R3')
 		self.addLink('R3', 'R4')
-
+		
 		# adding attacker to topology
 		attacker_node = self.addNode(ATTACKER_NAME)
 		hosts.append(attacker_node)
 
-		for i in xrange(2):
-			hub_name = HUB_NAME + str(i+1)
-			host_name = TEST_HOST_NAME + str(i+1)
+		hub_name = HUB_NAME + '1'
 
-			# adding bridge between R1 and R2
-			self.addSwitch(hub_name, cls=OVSSwitch)
-
-			self.addLink(hub_name, 'R%s' % (i+1))
-			self.addLink(hub_name, 'R%s' % (i+2))
-
-			# adding test host on bridge
-			test_host_node = self.addNode(host_name)
-			hosts.append(test_host_node)
-
-			self.addLink(hub_name, host_name)
-
-			self.addLink(hub_name, ATTACKER_NAME)
+		# adding hub between R1, R2 and attacker
+		self.addSwitch(hub_name, cls=OVSSwitch)
+		self.addLink(hub_name, 'R1')
+		self.addLink(hub_name, 'R2')
+		self.addLink(hub_name, ATTACKER_NAME)
 
 		return
 
@@ -125,12 +117,6 @@ class SimpleTopo(Topo):
 def getIP(hostname):
 	if hostname == ATTACKER_NAME:
 		return '9.0.0.3'
-
-	if hostname == (TEST_HOST_NAME + str(1)):
-		return '9.0.0.4'
-
-	if hostname == (TEST_HOST_NAME + str(2)):
-		return '9.0.1.3'
 
 	AS, idx = hostname.replace('h', '').split('-')
 	AS = int(AS)
@@ -172,49 +158,50 @@ def launch_attack(attacker_host, choise):
 
 	log("attack launched", 'red')
 
+
+def init_quagga_state_dir():
+	if not os.path.exists(QUAGGA_STATE_DIR):
+		os.makedirs(QUAGGA_STATE_DIR)
+
+	os.system('chown mininet:mininet %s' % QUAGGA_STATE_DIR)
+
+	return
+
+
 def main():
 	os.system("rm -f /tmp/R*.log /tmp/bgp-R?.pid /tmp/zebra-R?.pid 2> /dev/null")
-	os.system("rm -r logs/*stdout /tmp/hub.log /tmp/attacker_attacks.log /tmp/testhost* 2> /dev/null")
+	os.system("rm -r logs/*stdout /tmp/hub.log /tmp/attacker_attacks.log 2> /dev/null")
 	os.system("mn -c > /dev/null 2>&1")
-	os.system("killall -9 zebra bgpd > /dev/null 2>&1")
+	os.system('pgrep zebra | xargs kill -9')
+	os.system('pgrep bgpd | xargs kill -9')
+	os.system('pgrep pox | xargs kill -9')
 	os.system('pgrep -f webserver.py | xargs kill -9')
+
+	init_quagga_state_dir()
 
 	startPOXHub()
 
 	net = Mininet(topo=SimpleTopo(), switch=Router)
-	net.addController(name='poxController', controller=RemoteController, ip='127.0.0.1', port=6633)
+	net.addController(name='poxController', controller=RemoteController, ip='0.0.0.0', port=6633)
 	net.start()
 
 	# CONFIGURING HOSTS
-
 	attacker_host = None
-	# insider_host = None
 
 	for host in net.hosts:
-		# host.setIP(getIP(host.name))
 		host.cmd("ifconfig %s-eth0 %s" % (host.name, getIP(host.name)))
 
-		if host.name != ATTACKER_NAME and TEST_HOST_NAME not in host.name:
-			# host.setDefaultRoute(getGateway(host.name))
+		if host.name != ATTACKER_NAME:
 			host.cmd("route add default gw %s" % (getGateway(host.name)))
-
-		if host.name == ATTACKER_NAME:
+		else:
 			host.cmd("ifconfig %s-eth0 %s" % (host.name, '9.0.0.3'))
-			host.cmd("ifconfig %s-eth1 %s" % (host.name, '9.0.1.3'))
 			attacker_host = host
-
-		# if host.name == 'h1-3':
-		#	insider_host = host
-
-	os.system('./testhost1_tcpdump.sh > /tmp/testhost1_tcpdump.log 2>&1 &')
-	os.system('./testhost2_tcpdump.sh > /tmp/testhost2_tcpdump.log 2>&1 &')
 
 	for i in xrange(ASES):
 		log("Starting web server on h%s-1" % (i+1), 'yellow')
 		startWebserver(net, 'h%s-1' % (i+1), "Web server on h%s-1" % (i+1))
 
 	# CONFIGURING ROUTERS
-
 	for router in net.switches:
 		if HUB_NAME not in router.name:
 			router.cmd("sysctl -w net.ipv4.ip_forward=1")
@@ -225,9 +212,9 @@ def main():
 
 	for router in net.switches:
 		if HUB_NAME not in router.name:
-			router.cmd("/usr/lib/quagga/zebra -f conf/zebra-%s.conf -d -i /tmp/zebra-%s.pid > logs/%s-zebra-stdout 2>&1" % (router.name, router.name, router.name))
+			router.cmd("~/quagga-1.2.4/zebra/zebra -f conf/zebra-%s.conf -d -i /tmp/zebra-%s.pid > logs/%s-zebra-stdout 2>&1" % (router.name, router.name, router.name))
 			router.waitOutput()
-			router.cmd("/usr/lib/quagga/bgpd -f conf/bgpd-%s.conf -d -i /tmp/bgp-%s.pid > logs/%s-bgpd-stdout 2>&1" % (router.name, router.name, router.name), shell=True)
+			router.cmd("~/quagga-1.2.4/bgpd/bgpd -f conf/bgpd-%s.conf -d -i /tmp/bgp-%s.pid > logs/%s-bgpd-stdout 2>&1" % (router.name, router.name, router.name), shell=True)
 			router.waitOutput()
 			log("Starting zebra and bgpd on %s" % router.name)
 
@@ -238,10 +225,13 @@ def main():
 	choise = -1
 
 	while choise != 0:
-		choise = input("Choose the attack:\n1) blind RST attack\n2) blind SYN attack\n3) blind UPDATE attack\n0) exit\n> ")
+		choise = input("Choose:\n1) blind RST attack\n2) blind SYN attack\n3) blind UPDATE attack\n4) mininet CLI\n0) exit\n> ")
 
-		if choise != 0:
+		if 0 < choise < 4:
 			launch_attack(attacker_host, choise)
+
+		if choise == 4:
+			CLI(net)
 
 	"""
 	log("Collecting data for %s seconds (estimated %s)..." % \
@@ -249,12 +239,13 @@ def main():
 	sleep(CAPTURING_WINDOW)
 	#"""
 
-	#CLI(net)
 	net.stop()
 
 	stopPOXHub()
 
-	os.system("killall -9 zebra bgpd")
+	os.system('pgrep zebra | xargs kill -9')
+	os.system('pgrep bgpd | xargs kill -9')
+	os.system('pgrep pox | xargs kill -9')
 	os.system('pgrep -f webserver.py | xargs kill -9')
 
 
