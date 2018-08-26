@@ -96,28 +96,25 @@ class SimpleTopo(Topo):
 				hosts.append(host)
 				self.addLink(router, host)
 
-		self.addLink('R2', 'R3')
 		self.addLink('R3', 'R4')
 		
 		# adding attacker to topology
 		attacker_node = self.addNode(ATTACKER_NAME)
 		hosts.append(attacker_node)
 
-		hub_name = HUB_NAME + '1'
+		for i in xrange(2):
+			hub_name = HUB_NAME + '%s' % (i+1)
 
-		# adding hub between R1, R2 and attacker
-		self.addSwitch(hub_name, cls=OVSSwitch)
-		self.addLink(hub_name, 'R1')
-		self.addLink(hub_name, 'R2')
-		self.addLink(hub_name, ATTACKER_NAME)
+			# adding hub between routers and attacker
+			self.addSwitch(hub_name, cls=OVSSwitch)
+			self.addLink(hub_name, 'R%s' % (i+1))
+			self.addLink(hub_name, 'R%s' % (i+2))
+			self.addLink(hub_name, ATTACKER_NAME)
 
 		return
 
 
 def getIP(hostname):
-	if hostname == ATTACKER_NAME:
-		return '9.0.0.3'
-
 	AS, idx = hostname.replace('h', '').split('-')
 	AS = int(AS)
 
@@ -144,6 +141,9 @@ def startPOXHub():
 	log("Starting POX RemoteController")
 	os.system("python %s --verbose forwarding.hub > /tmp/hub.log 2>&1 &" % POX)
 
+	log("Waiting %d seconds for pox RemoteController to start..." % args.sleep, col='cyan')
+	sleep(args.sleep)
+
 
 def stopPOXHub():
 	log("Stopping POX RemoteController")
@@ -153,8 +153,8 @@ def stopPOXHub():
 def launch_attack(attacker_host, choise):
 	log("launching attack", 'red')
 
-	attacker_host.popen("python attacker_attacks.py %s > /tmp/attacker_attacks.log 2>&1" % choise, shell=True)
-	os.system('lxterminal -e "/bin/bash -c \'tail -f /tmp/attacker_attacks.log\'" &')
+	attacker_host.popen("python attacks.py %s > /tmp/attacks.log 2>&1" % choise, shell=True)
+	os.system('lxterminal -e "/bin/bash -c \'tail -f /tmp/attacks.log\'" &')
 
 	log("attack launched", 'red')
 
@@ -170,7 +170,7 @@ def init_quagga_state_dir():
 
 def main():
 	os.system("rm -f /tmp/R*.log /tmp/bgp-R?.pid /tmp/zebra-R?.pid 2> /dev/null")
-	os.system("rm -r logs/*stdout /tmp/hub.log /tmp/attacker_attacks.log 2> /dev/null")
+	os.system("rm -r logs/*stdout /tmp/hub.log /tmp/attacks.log 2> /dev/null")
 	os.system("mn -c > /dev/null 2>&1")
 	os.system('pgrep zebra | xargs kill -9')
 	os.system('pgrep bgpd | xargs kill -9')
@@ -182,26 +182,26 @@ def main():
 	startPOXHub()
 
 	net = Mininet(topo=SimpleTopo(), switch=Router)
-	net.addController(name='poxController', controller=RemoteController, ip='0.0.0.0', port=6633)
+	net.addController(name='poxController', controller=RemoteController, ip='127.0.0.1', port=6633)
 	net.start()
 
-	# CONFIGURING HOSTS
+	log("configuring hosts ...")
 	attacker_host = None
 
 	for host in net.hosts:
-		host.cmd("ifconfig %s-eth0 %s" % (host.name, getIP(host.name)))
-
 		if host.name != ATTACKER_NAME:
+			host.cmd("ifconfig %s-eth0 %s" % (host.name, getIP(host.name)))
 			host.cmd("route add default gw %s" % (getGateway(host.name)))
 		else:
 			host.cmd("ifconfig %s-eth0 %s" % (host.name, '9.0.0.3'))
+			host.cmd("ifconfig %s-eth1 %s" % (host.name, '9.0.1.3'))
 			attacker_host = host
 
 	for i in xrange(ASES):
 		log("Starting web server on h%s-1" % (i+1), 'yellow')
 		startWebserver(net, 'h%s-1' % (i+1), "Web server on h%s-1" % (i+1))
-
-	# CONFIGURING ROUTERS
+	
+	log("configuring routers ...")
 	for router in net.switches:
 		if HUB_NAME not in router.name:
 			router.cmd("sysctl -w net.ipv4.ip_forward=1")
