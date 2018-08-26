@@ -153,10 +153,8 @@ def stopPOXHub():
 def launch_attack(attacker_host, choise):
 	log("launching attack", 'red')
 
-	attacker_host.popen("python attacks.py %s > /tmp/attacks.log 2>&1" % choise, shell=True)
+	attacker_host.popen("python attacks.py %s > /tmp/attacks.log" % choise, shell=True)
 	os.system('lxterminal -e "/bin/bash -c \'tail -f /tmp/attacks.log\'" &')
-
-	log("attack launched", 'red')
 
 
 def init_quagga_state_dir():

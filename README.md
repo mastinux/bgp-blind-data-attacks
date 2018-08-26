@@ -20,6 +20,8 @@ Migrating configuration and tests from GNS3 to mininet
 
 - `mn --version`
 
+---
+
 ## Quagga preparation
 
 - download quagga-1.2.4 from [here](http://download.savannah.gnu.org/releases/quagga/) in your `$HOME` and extract it
@@ -35,4 +37,16 @@ Migrating configuration and tests from GNS3 to mininet
 - `./configure --enable-user=mininet --enable-group=mininet`
 
 - `make`
+
+---
+
+## Contrib preparation
+
+- download [bgp.py](https://github.com/levigross/Scapy/blob/master/scapy/contrib/bgp.py)
+
+- `mkdir /usr/lib/python2.7/dist-packages/scapy/contrib`
+
+- `cp bgp.py /usr/lib/python2.7/dist-packages/scapy/contrib`
+
+- `touch /usr/lib/python2.7/dist-packages/scapy/contrib/__init__.py`
 
