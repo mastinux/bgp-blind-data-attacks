@@ -2,9 +2,9 @@
 
 import sys
 import os
-import termcolor as T
 import time
 import datetime
+import signal
 
 from mininet.topo import Topo
 from mininet.net import Mininet
@@ -16,13 +16,14 @@ from subprocess import Popen, PIPE, check_output
 from time import sleep, time
 from multiprocessing import Process
 from argparse import ArgumentParser
+from utils import log, log2
 
 POX = '%s/pox/pox.py' % os.environ[ 'HOME' ]
 
 ASES = 4
 HOSTS_PER_AS = 3
-BGP_CONVERGENCE_TIME = 0 #60
-CAPTURING_WINDOW = 120
+BGP_CONVERGENCE_TIME = 10 #60
+CAPTURING_WINDOW_TIME = 120
 
 HUB_NAME = 'hub'
 ATTACKER_NAME = 'atk1'
@@ -35,10 +36,6 @@ setLogLevel('info')
 parser = ArgumentParser("Configure simple BGP network in Mininet.")
 parser.add_argument('--sleep', default=3, type=int)
 args = parser.parse_args()
-
-
-def log(s, col="green"):
-	print T.colored(s, col)
 
 
 class Router(Switch):
@@ -141,8 +138,7 @@ def startPOXHub():
 	log("Starting POX RemoteController")
 	os.system("python %s --verbose forwarding.hub > /tmp/hub.log 2>&1 &" % POX)
 
-	log("Waiting %d seconds for pox RemoteController to start..." % args.sleep, col='cyan')
-	sleep(args.sleep)
+	log2("pox RemoteController to start", args.sleep, col='cyan')
 
 
 def stopPOXHub():
@@ -151,7 +147,8 @@ def stopPOXHub():
 
 
 def launch_attack(net, choice):
-	log("launching attack", 'red')
+	log("Launching attack", 'red')
+	log("Check opened terminal", 'red')
 
 	attacker_host = None
 
@@ -162,7 +159,7 @@ def launch_attack(net, choice):
 				router.cmd("tcpdump -i R2-eth4 -w /tmp/R2-eth4-blind-syn-attack.pcap &", shell=True)
 				router.cmd("tcpdump -i R2-eth5 -w /tmp/R2-eth5-blind-syn-attack.pcap &", shell=True)
 
-	# capturing files on hosts
+	# capturing packets on hosts
 	for host in net.hosts:
 		if host.name == ATTACKER_NAME:
 			attacker_host = host
@@ -171,11 +168,8 @@ def launch_attack(net, choice):
 				attacker_host.popen("tcpdump -i atk1-eth0 -w /tmp/atk1-eth0-blind-syn-attack.pcap &", shell=True)
 
 	# launching attack
-	attacker_host.popen("python attacks.py %s > /tmp/attacks.log" % choice, shell=True)
+	attacker_host.popen("python attacks.py %s %s > /tmp/attacks.log" % (choice, os.getpid()), shell=True)
 	os.system('lxterminal -e "/bin/bash -c \'tail -f /tmp/attacks.log\'" > /dev/null 2>&1 &')
-
-	# TODO sleep a proper time in order to collect enough packets
-	sleep(args.sleep)
 
 
 def init_quagga_state_dir():
@@ -208,7 +202,7 @@ def main():
 	net.addController(name='poxController', controller=RemoteController, ip='127.0.0.1', port=6633)
 	net.start()
 
-	log("configuring hosts ...")
+	log("Configuring hosts ...")
 	for host in net.hosts:
 		if host.name != ATTACKER_NAME:
 			host.cmd("ifconfig %s-eth0 %s" % (host.name, getIP(host.name)))
@@ -221,14 +215,13 @@ def main():
 		log("Starting web server on h%s-1" % (i+1), 'yellow')
 		startWebserver(net, 'h%s-1' % (i+1), "Web server on h%s-1" % (i+1))
 	
-	log("configuring routers ...")
+	log("Configuring routers ...")
 	for router in net.switches:
 		if HUB_NAME not in router.name:
 			router.cmd("sysctl -w net.ipv4.ip_forward=1")
 			router.waitOutput()
 
-	log("Waiting %d seconds for sysctl changes to take effect..." % args.sleep, col='cyan')
-	sleep(args.sleep)
+	log2("sysctl changes to take effect", args.sleep, col='cyan')
 
 	for router in net.switches:
 		if HUB_NAME not in router.name:
@@ -238,9 +231,7 @@ def main():
 			router.waitOutput()
 			log("Starting zebra and bgpd on %s" % router.name)
 
-	log("Waiting %d seconds for BGP convergence (estimated %s)..."  % \
-		(BGP_CONVERGENCE_TIME, (datetime.datetime.now()+datetime.timedelta(0, BGP_CONVERGENCE_TIME)).strftime("%H:%M:%S")), 'cyan')
-	sleep(BGP_CONVERGENCE_TIME)
+	log2("BGP convergence", BGP_CONVERGENCE_TIME, 'cyan')
 
 	choice = -1
 
@@ -252,11 +243,7 @@ def main():
 		elif choice == 4:
 			CLI(net)
 
-	"""
-	log("Collecting data for %s seconds (estimated %s)..." % \
-		(CAPTURING_WINDOW, (datetime.datetime.now()+datetime.timedelta(0,CAPTURING_WINDOW)).strftime("%H:%M:%S")), 'cyan')
-	sleep(CAPTURING_WINDOW)
-	#"""
+	#log2('packets collection', CAPTURING_WINDOW_TIME)
 
 	net.stop()
 
