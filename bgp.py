@@ -2,9 +2,6 @@
 
 import sys
 import os
-import time
-import datetime
-import signal
 
 from mininet.topo import Topo
 from mininet.net import Mininet
@@ -13,7 +10,6 @@ from mininet.util import dumpNodeConnections, quietRun, moveIntf, waitListening
 from mininet.cli import CLI
 from mininet.node import Switch, OVSSwitch, Controller, RemoteController
 from subprocess import Popen, PIPE, check_output
-from time import sleep, time
 from multiprocessing import Process
 from argparse import ArgumentParser
 from utils import log, log2
@@ -154,18 +150,30 @@ def launch_attack(net, choice):
 
 	# capturing packets on routers
 	for router in net.switches:
-		if choice == 2:
+		if choice == 1:
 			if router.name == 'R2':
-				router.cmd("tcpdump -i R2-eth4 -w /tmp/R2-eth4-blind-syn-attack.pcap &", shell=True)
-				router.cmd("tcpdump -i R2-eth5 -w /tmp/R2-eth5-blind-syn-attack.pcap &", shell=True)
+				router.cmd("tcpdump -i R2-eth4 -w /tmp/R2-eth4-blind-rst-attack.pcap not arp &", shell=True)
+				router.cmd("tcpdump -i R2-eth5 -w /tmp/R2-eth5-blind-rst-attack.pcap not arp &", shell=True)
+		elif choice == 2:
+			if router.name == 'R2':
+				router.cmd("tcpdump -i R2-eth4 -w /tmp/R2-eth4-blind-syn-attack.pcap not arp &", shell=True)
+				router.cmd("tcpdump -i R2-eth5 -w /tmp/R2-eth5-blind-syn-attack.pcap not arp &", shell=True)
+		elif choice == 3:
+			if router.name == 'R2':
+				router.cmd("tcpdump -i R2-eth4 -w /tmp/R2-eth4-blind-data-attack.pcap not arp &", shell=True)
+				#router.cmd("tcpdump -i R2-eth5 -w /tmp/R2-eth5-blind-data-attack.pcap not arp &", shell=True)
 
 	# capturing packets on hosts
 	for host in net.hosts:
 		if host.name == ATTACKER_NAME:
 			attacker_host = host
 
-			if choice == 2:
-				attacker_host.popen("tcpdump -i atk1-eth0 -w /tmp/atk1-eth0-blind-syn-attack.pcap &", shell=True)
+			if choice == 1:
+				attacker_host.popen("tcpdump -i atk1-eth0 -w /tmp/atk1-eth0-blind-rst-attack.pcap not arp &", shell=True)
+			elif choice == 2:
+				attacker_host.popen("tcpdump -i atk1-eth0 -w /tmp/atk1-eth0-blind-syn-attack.pcap not arp &", shell=True)
+			elif choice == 3:
+				attacker_host.popen("tcpdump -i atk1-eth0 -w /tmp/atk1-eth0-blind-data-attack.pcap not arp &", shell=True)
 
 	# launching attack
 	attacker_host.popen("python attacks.py %s %s > /tmp/attacks.log" % (choice, os.getpid()), shell=True)
@@ -185,7 +193,7 @@ def main():
 	os.system("rm -f /tmp/bgp-R?.pid /tmp/zebra-R?.pid 2> /dev/null")
 	os.system("rm -f /tmp/R*.log /tmp/R*.pcap 2> /dev/null")
 	os.system("rm -r logs/R*stdout 2> /dev/null")
-	os.system("rm -r /tmp/hub.log /tmp/attacks.log /tmp/atk1*.pcap 2> /dev/null")
+	os.system("rm -r /tmp/hub.log /tmp/attacks.* /tmp/atk1*.pcap 2> /dev/null")
 
 	os.system("mn -c > /dev/null 2>&1")
 
@@ -199,7 +207,8 @@ def main():
 	startPOXHub()
 
 	net = Mininet(topo=SimpleTopo(), switch=Router)
-	net.addController(name='poxController', controller=RemoteController, ip='127.0.0.1', port=6633)
+	net.addController(name='poxController', controller=RemoteController, \
+		ip='127.0.0.1', port=6633)
 	net.start()
 
 	log("Configuring hosts ...")
@@ -221,14 +230,21 @@ def main():
 			router.cmd("sysctl -w net.ipv4.ip_forward=1")
 			router.waitOutput()
 
+			if router.name == 'R2':
+				router.cmd("tcpdump -i R2-eth5 -w /tmp/R2-eth5-blind-data-attack.pcap not arp &", shell=True)
+
 	log2("sysctl changes to take effect", args.sleep, col='cyan')
 
 	for router in net.switches:
 		if HUB_NAME not in router.name:
-			router.cmd("~/quagga-1.2.4/zebra/zebra -f conf/zebra-%s.conf -d -i /tmp/zebra-%s.pid > logs/%s-zebra-stdout 2>&1" % (router.name, router.name, router.name))
+			router.cmd("~/quagga-1.2.4/zebra/zebra -f conf/zebra-%s.conf -d -i /tmp/zebra-%s.pid > logs/%s-zebra-stdout 2>&1" % \
+				(router.name, router.name, router.name))
 			router.waitOutput()
-			router.cmd("~/quagga-1.2.4/bgpd/bgpd -f conf/bgpd-%s.conf -d -i /tmp/bgp-%s.pid > logs/%s-bgpd-stdout 2>&1" % (router.name, router.name, router.name), shell=True)
+
+			router.cmd("~/quagga-1.2.4/bgpd/bgpd -f conf/bgpd-%s.conf -d -i /tmp/bgp-%s.pid > logs/%s-bgpd-stdout 2>&1" % \
+				(router.name, router.name, router.name), shell=True)
 			router.waitOutput()
+
 			log("Starting zebra and bgpd on %s" % router.name)
 
 	log2("BGP convergence", BGP_CONVERGENCE_TIME, 'cyan')
@@ -242,8 +258,6 @@ def main():
 			launch_attack(net, choice)
 		elif choice == 4:
 			CLI(net)
-
-	#log2('packets collection', CAPTURING_WINDOW_TIME)
 
 	net.stop()
 

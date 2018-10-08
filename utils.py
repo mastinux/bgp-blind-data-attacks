@@ -1,5 +1,5 @@
 import sys
-import termcolor as T
+import termcolor
 import datetime
 import time
 
@@ -15,7 +15,7 @@ def log(s, col="green"):
 		cyan
 		white
 	"""
-	print T.colored('[%s] %s' % \
+	print termcolor.colored('[%s] %s' % \
 		(datetime.datetime.now().strftime("%H:%M:%S"), s), col)
 
 	sys.stdout.flush()
@@ -23,6 +23,8 @@ def log(s, col="green"):
 
 def log2(reason, interval=10, col="green"):
 	log('Waiting %s seconds for %s ...' % (interval, reason) , col)
+
+	sys.stdout.flush()
 
 	time.sleep(interval)
 
