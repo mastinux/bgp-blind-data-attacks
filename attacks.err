@@ -1,7 +1,0 @@
-WARNING: No route found for IPv6 destination :: (no default route?)
-Traceback (most recent call last):
-  File "attacks.py", line 12, in <module>
-    from custom_classes import CustomBGPPathAttribute
-  File "/home/mininet/mastinux-routing-attacks/bgp-blind-data-attacks/custom_classes.py", line 3, in <module>
-    class CustomBGPPathAttribute(BGPPathAttribute):
-NameError: name 'BGPPathAttribute' is not defined

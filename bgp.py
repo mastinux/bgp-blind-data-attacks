@@ -148,36 +148,30 @@ def launch_attack(net, choice):
 
 	attacker_host = None
 
+	if choice == 1:
+		packet_name = 'rst'
+	elif choice == 2:
+		packet_name = 'syn'
+	else: # choice == 3
+		packet_name = 'data'
+
 	# capturing packets on routers
 	for router in net.switches:
-		if choice == 1:
-			if router.name == 'R2':
-				router.cmd("tcpdump -i R2-eth4 -w /tmp/R2-eth4-blind-rst-attack.pcap not arp &", shell=True)
-				router.cmd("tcpdump -i R2-eth5 -w /tmp/R2-eth5-blind-rst-attack.pcap not arp &", shell=True)
-		elif choice == 2:
-			if router.name == 'R2':
-				router.cmd("tcpdump -i R2-eth4 -w /tmp/R2-eth4-blind-syn-attack.pcap not arp &", shell=True)
-				router.cmd("tcpdump -i R2-eth5 -w /tmp/R2-eth5-blind-syn-attack.pcap not arp &", shell=True)
-		elif choice == 3:
-			if router.name == 'R2':
-				router.cmd("tcpdump -i R2-eth4 -w /tmp/R2-eth4-blind-data-attack.pcap not arp &", shell=True)
-				#router.cmd("tcpdump -i R2-eth5 -w /tmp/R2-eth5-blind-data-attack.pcap not arp &", shell=True)
+		if router.name == 'R2':
+			router.cmd("tcpdump -i R2-eth4 -w /tmp/R2-eth4-blind-%s-attack.pcap not arp &" % (packet_name), shell=True)
+			# COLLECT-IT remove following comment and remove the line on the other # COLLECT-IT comment
+			#router.cmd("tcpdump -i R2-eth5 -w /tmp/R2-eth5-blind-%s-attack.pcap not arp &" % (packet_name), shell=True)
 
 	# capturing packets on hosts
 	for host in net.hosts:
 		if host.name == ATTACKER_NAME:
 			attacker_host = host
-
-			if choice == 1:
-				attacker_host.popen("tcpdump -i atk1-eth0 -w /tmp/atk1-eth0-blind-rst-attack.pcap not arp &", shell=True)
-			elif choice == 2:
-				attacker_host.popen("tcpdump -i atk1-eth0 -w /tmp/atk1-eth0-blind-syn-attack.pcap not arp &", shell=True)
-			elif choice == 3:
-				attacker_host.popen("tcpdump -i atk1-eth0 -w /tmp/atk1-eth0-blind-data-attack.pcap not arp &", shell=True)
+			attacker_host.popen("tcpdump -i atk1-eth0 -w /tmp/atk1-eth0-blind-%s-attack.pcap not arp &" % (packet_name), shell=True)
 
 	# launching attack
-	attacker_host.popen("python attacks.py %s %s > /tmp/attacks.log" % (choice, os.getpid()), shell=True)
-	os.system('lxterminal -e "/bin/bash -c \'tail -f /tmp/attacks.log\'" > /dev/null 2>&1 &')
+	attacker_host.popen("python attacks.py %s %s > /tmp/attacks.out 2> /tmp/attacks.err" % (choice, os.getpid()), shell=True)
+	os.system('lxterminal -e "/bin/bash -c \'tail -f /tmp/attacks.out\'" > /dev/null 2>&1 &')
+	os.system('lxterminal -e "/bin/bash -c \'tail -f /tmp/attacks.err\'" > /dev/null 2>&1 &')
 
 
 def init_quagga_state_dir():
@@ -231,6 +225,8 @@ def main():
 			router.waitOutput()
 
 			if router.name == 'R2':
+				# COLLECT-IT
+				# collecting packets in order to understand BGP UPDATE messages
 				router.cmd("tcpdump -i R2-eth5 -w /tmp/R2-eth5-blind-data-attack.pcap not arp &", shell=True)
 
 	log2("sysctl changes to take effect", args.sleep, col='cyan')
@@ -253,11 +249,16 @@ def main():
 
 	while choice != 0:
 		choice = input("Choose:\n1) blind RST attack\n2) blind SYN attack\n3) blind UPDATE attack\n4) mininet CLI\n0) exit\n> ")
+		#choice = 3
 
 		if 0 < choice < 4:
 			launch_attack(net, choice)
 		elif choice == 4:
 			CLI(net)
+
+		#log2('letting attack take effect', 100, 'red')
+		#choice = 0
+		#raw_input("Press the <ENTER> to exit ...")
 
 	net.stop()
 

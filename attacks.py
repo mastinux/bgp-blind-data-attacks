@@ -18,7 +18,7 @@ SOURCE_ADDRESS = '9.0.1.2'
 DESTINATION_ADDRESS = '9.0.1.1'
 BLIND_RST_ATTACK_COLLECT_TIME = 15 * 2 # <keepalive> * 2
 BLIND_SYN_ATTACK_COLLECT_TIME = 15 * 2 # <keepalive> * 2
-BLIND_DATA_ATTACK_COLLECT_TIME = 15 * 2 # <keepalive> * 2
+BLIND_DATA_ATTACK_COLLECT_TIME = 15 * 4 # <keepalive> * 2
 
 
 def send_rst_packet(iface, srcMac, dstMac, srcIP, srcPort, dstIP, dstPort, seqNum, ackNum, win):
