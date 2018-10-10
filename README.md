@@ -125,10 +125,3 @@ When the AN and the SN are in the acceptable window and also correspond to the e
 |-|UPDATE or KEEPALIVE -&gt;|o|-|-|-|-|
 |o|&lt;- | ACK war | -&gt;|o|-|-|
 
-*TODO*:  
-	Path Attributes > Path Attribute - AS_PATH > Flags = 50  
-	Path Attributes > Path Attribute - AS_PATH > Length = 0x06  
-	but it must be  
-	Path Attributes > Path Attribute - AS_PATH > Length = 0x00 0x06  
-	lanciando l'attacco 3 non viene creato i file di log .out e .err  
-	capire qual è il problema di estensione della classe degli attributi del bgp
