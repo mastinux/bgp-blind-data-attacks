@@ -55,7 +55,9 @@ Migrating configuration and tests from GNS3 to mininet
 - `touch /usr/lib/python2.7/dist-packages/scapy/contrib/__init__.py`
 
 ---
+
 ---
+
 ---
 
 # Expected results
@@ -125,3 +127,34 @@ When the AN and the SN are in the acceptable window and also correspond to the e
 |-|UPDATE or KEEPALIVE -&gt;|o|-|-|-|-|
 |o|&lt;- | ACK war | -&gt;|o|-|-|
 
+- start topology  
+	`# python bgp.py`
+
+- choose attack and follow the instructions printed on the opened window
+	`> 2`
+
+- stop topology  
+	`> 0`
+
+- analyze pcap capture files  
+	`wireshark /tmp/atk1-eth0-blind-data-attack.pcap`
+	`wireshark /tmp/R2-eth4-blind-data-attack.pcap`  
+	`wireshark /tmp/R2-eth5-blind-data-attack.pcap`
+
+---
+
+show quagga routing table
+
+`show ip bgp`
+
+---
+
+*TODO* : 
+
+- ricontrollare se AN e SN sono effettivamente quelli che R2 si aspetta
+
+- capire perchè il BGP UPDATE message non influenza la routing table di R2
+
+- prova a impostare un timer più lungo
+
+- trova il modo di creare il log della routing table

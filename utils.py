@@ -28,6 +28,7 @@ def log2(reason, interval=10, col="green"):
 
 	time.sleep(interval)
 
+
 def string_to_hex(s):
 	return ':'.join(x.encode('hex') for x in s) + ' len:' + str(len(s))
 

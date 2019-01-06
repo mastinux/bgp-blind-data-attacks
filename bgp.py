@@ -8,7 +8,7 @@ from mininet.net import Mininet
 from mininet.log import lg, info, setLogLevel
 from mininet.util import dumpNodeConnections, quietRun, moveIntf, waitListening
 from mininet.cli import CLI
-from mininet.node import Switch, OVSSwitch, Controller, RemoteController
+from mininet.node import Switch, OVSSwitch, Controller, RemoteController, Node
 from subprocess import Popen, PIPE, check_output
 from multiprocessing import Process
 from argparse import ArgumentParser
@@ -18,8 +18,7 @@ POX = '%s/pox/pox.py' % os.environ[ 'HOME' ]
 
 ASES = 4
 HOSTS_PER_AS = 3
-BGP_CONVERGENCE_TIME = 10 #60
-CAPTURING_WINDOW_TIME = 120
+BGP_CONVERGENCE_TIME = 15 * 2 # <keepalive> * 2
 
 HUB_NAME = 'hub'
 ATTACKER_NAME = 'atk1'
@@ -51,6 +50,9 @@ class Router(Switch):
 		return
 
 	def start(self, controllers):
+		for i in self.intfList():
+			i.setMAC(get_MAC(i.name))
+
 		pass
 
 	def stop(self):
@@ -107,6 +109,29 @@ class SimpleTopo(Topo):
 		return
 
 
+def get_MAC(interface):
+	if interface == 'lo':
+		return None
+
+	# R2-eth0 or atk1-eth0
+	c = ''
+	l = interface.split('-')
+	x = ''
+
+	if 'R' in l[0]:
+		c = l[0].replace('R', '')
+	else:
+		c = 'a'
+
+	couple = c * 2
+	identity = '0' + l[1].replace('eth', '')
+	s = ':'.join([couple for _ in range(5)]) + ':' + identity
+
+	#print interface, '->', s
+
+	return s
+
+
 def getIP(hostname):
 	AS, idx = hostname.replace('h', '').split('-')
 	AS = int(AS)
@@ -147,31 +172,33 @@ def launch_attack(net, choice):
 	log("Check opened terminal", 'red')
 
 	attacker_host = None
-
-	if choice == 1:
-		packet_name = 'rst'
-	elif choice == 2:
-		packet_name = 'syn'
-	else: # choice == 3
-		packet_name = 'data'
-
-	# capturing packets on routers
-	for router in net.switches:
-		if router.name == 'R2':
-			router.cmd("tcpdump -i R2-eth4 -w /tmp/R2-eth4-blind-%s-attack.pcap not arp &" % (packet_name), shell=True)
-			# COLLECT-IT remove following comment and remove the line on the other # COLLECT-IT comment
-			#router.cmd("tcpdump -i R2-eth5 -w /tmp/R2-eth5-blind-%s-attack.pcap not arp &" % (packet_name), shell=True)
+	attacker_mac_address = None
+	r2_eth4_mac_address = None
 
 	# capturing packets on hosts
 	for host in net.hosts:
 		if host.name == ATTACKER_NAME:
 			attacker_host = host
-			attacker_host.popen("tcpdump -i atk1-eth0 -w /tmp/atk1-eth0-blind-%s-attack.pcap not arp &" % (packet_name), shell=True)
+			attacker_mac_address = host.MAC()
+
+	for router in net.switches:
+		if router.name == 'R2':
+			for i in router.intfList():
+				if 'eth4' in i.name:
+					r2_eth4_mac_address = i.MAC()
+
+	assert attacker_mac_address is not None
+	assert r2_eth4_mac_address is not None
 
 	# launching attack
-	attacker_host.popen("python attacks.py %s %s > /tmp/attacks.out 2> /tmp/attacks.err" % (choice, os.getpid()), shell=True)
-	os.system('lxterminal -e "/bin/bash -c \'tail -f /tmp/attacks.out\'" > /dev/null 2>&1 &')
-	os.system('lxterminal -e "/bin/bash -c \'tail -f /tmp/attacks.err\'" > /dev/null 2>&1 &')
+	attacker_host.popen("python attacks.py %s %s %s %s > /tmp/attacks.out 2> /tmp/attacks.err &" % \
+		(choice, os.getpid(), attacker_mac_address, r2_eth4_mac_address), shell=True)
+
+	os.system('lxterminal -e "/bin/bash -c \'echo --- attacks.out content ---; echo; tail -f /tmp/attacks.out\'" > /dev/null 2>&1 &')
+	os.system('lxterminal -e "/bin/bash -c \'echo --- attacks.err content ---; echo; tail -f /tmp/attacks.err\'" > /dev/null 2>&1 &')
+
+	# se non trovi l'ack
+	# costruiscilo
 
 
 def init_quagga_state_dir():
@@ -182,8 +209,9 @@ def init_quagga_state_dir():
 
 	return
 
-
+	
 def main():
+	os.system("reset")
 	os.system("rm -f /tmp/bgp-R?.pid /tmp/zebra-R?.pid 2> /dev/null")
 	os.system("rm -f /tmp/R*.log /tmp/R*.pcap 2> /dev/null")
 	os.system("rm -r logs/R*stdout 2> /dev/null")
@@ -214,20 +242,22 @@ def main():
 			host.cmd("ifconfig %s-eth0 %s" % (host.name, '9.0.0.3'))
 			host.cmd("ifconfig %s-eth1 %s" % (host.name, '9.0.1.3'))
 
+			for i in host.intfList():
+				i.setMAC(get_MAC(i.name))
+
+			# COLLECT-IT
+			host.cmd("tcpdump -i atk1-eth0 -w /tmp/atk1-eth0-blind-data-attack.pcap not arp > /tmp/tcpdump-atk1.out 2> /tmp/tcpdump-atk1.err &", shell=True)
+
 	for i in xrange(ASES):
 		log("Starting web server on h%s-1" % (i+1), 'yellow')
 		startWebserver(net, 'h%s-1' % (i+1), "Web server on h%s-1" % (i+1))
 	
 	log("Configuring routers ...")
 	for router in net.switches:
+
 		if HUB_NAME not in router.name:
 			router.cmd("sysctl -w net.ipv4.ip_forward=1")
 			router.waitOutput()
-
-			if router.name == 'R2':
-				# COLLECT-IT
-				# collecting packets in order to understand BGP UPDATE messages
-				router.cmd("tcpdump -i R2-eth5 -w /tmp/R2-eth5-blind-data-attack.pcap not arp &", shell=True)
 
 	log2("sysctl changes to take effect", args.sleep, col='cyan')
 
@@ -245,20 +275,32 @@ def main():
 
 	log2("BGP convergence", BGP_CONVERGENCE_TIME, 'cyan')
 
+	#os.system('lxterminal -e "/bin/bash -c \'echo --- tcpdump-atk1.out content ---; echo; tail -f /tmp/tcpdump-atk1.out\'" > /dev/null 2>&1 &')
+	#os.system('lxterminal -e "/bin/bash -c \'echo --- tcpdump-atk1.err content ---; echo; tail -f /tmp/tcpdump-atk1.err\'" > /dev/null 2>&1 &')
+	#os.system('lxterminal -e "/bin/bash -c \'echo --- tcpdump-R2-eth4.out content ---; echo; tail -f /tmp/tcpdump-R2-eth4.out\'" > /dev/null 2>&1 &')
+	#os.system('lxterminal -e "/bin/bash -c \'echo --- tcpdump-R2-eth4.err content ---; echo; tail -f /tmp/tcpdump-R2-eth4.err\'" > /dev/null 2>&1 &')
+	#os.system('lxterminal -e "/bin/bash -c \'echo --- tcpdump-R2-eth5.out content ---; echo; tail -f /tmp/tcpdump-R2-eth5.out\'" > /dev/null 2>&1 &')
+	#os.system('lxterminal -e "/bin/bash -c \'echo --- tcpdump-R2-eth5.err content ---; echo; tail -f /tmp/tcpdump-R2-eth5.err\'" > /dev/null 2>&1 &')
+
 	choice = -1
 
 	while choice != 0:
-		choice = input("Choose:\n1) blind RST attack\n2) blind SYN attack\n3) blind UPDATE attack\n4) mininet CLI\n0) exit\n> ")
-		#choice = 3
+		#choice = input("Choose:\n1) blind RST attack\n2) blind SYN attack\n3) blind UPDATE attack\n4) mininet CLI\n0) exit\n> ")
+		choice = 3
 
 		if 0 < choice < 4:
 			launch_attack(net, choice)
 		elif choice == 4:
 			CLI(net)
 
+		for router in net.switches:
+			if HUB_NAME not in router.name:
+				if router.name == 'R2':
+					router.cmd("tcpdump -i R2-eth4 -w /tmp/R2-eth4-blind-data-attack.pcap not arp > /tmp/tcpdump-R2-eth4.out 2> /tmp/tcpdump-R2-eth4.err &", shell=True)
+					router.cmd("tcpdump -i R2-eth5 -w /tmp/R2-eth5-blind-data-attack.pcap not arp > /tmp/tcpdump-R2-eth5.out 2> /tmp/tcpdump-R2-eth5.err &", shell=True)
+
 		#log2('letting attack take effect', 100, 'red')
-		#choice = 0
-		#raw_input("Press the <ENTER> to exit ...")
+		raw_input("Press the <ENTER> to exit ..."); choice = 0
 
 	net.stop()
 
@@ -268,6 +310,10 @@ def main():
 	os.system('pgrep bgpd | xargs kill -9')
 	os.system('pgrep pox | xargs kill -9')
 	os.system('pgrep -f webserver.py | xargs kill -9')
+
+	os.system('sudo wireshark /tmp/atk1-eth0-blind-data-attack.pcap -Y \'not ipv6\' &')
+	os.system('sudo wireshark /tmp/R2-eth4-blind-data-attack.pcap -Y \'not ipv6\' &')
+	os.system('sudo wireshark /tmp/R2-eth5-blind-data-attack.pcap -Y \'not ipv6\' &')
 
 
 if __name__ == "__main__":
