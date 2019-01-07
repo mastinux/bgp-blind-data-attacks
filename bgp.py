@@ -197,7 +197,7 @@ def launch_attack(net, choice):
 	os.system('lxterminal -e "/bin/bash -c \'echo --- attacks.out content ---; echo; tail -f /tmp/attacks.out\'" > /dev/null 2>&1 &')
 	os.system('lxterminal -e "/bin/bash -c \'echo --- attacks.err content ---; echo; tail -f /tmp/attacks.err\'" > /dev/null 2>&1 &')
 
-	# se non trovi l'ack
+	# TODO se non trovi l'ack
 	# costruiscilo
 
 
@@ -245,8 +245,7 @@ def main():
 			for i in host.intfList():
 				i.setMAC(get_MAC(i.name))
 
-			# COLLECT-IT
-			host.cmd("tcpdump -i atk1-eth0 -w /tmp/atk1-eth0-blind-data-attack.pcap not arp > /tmp/tcpdump-atk1.out 2> /tmp/tcpdump-atk1.err &", shell=True)
+			host.cmd("tcpdump -i atk1-eth0 -w /tmp/atk1-eth0-blind-attack.pcap not arp > /tmp/tcpdump-atk1.out 2> /tmp/tcpdump-atk1.err &", shell=True)
 
 	for i in xrange(ASES):
 		log("Starting web server on h%s-1" % (i+1), 'yellow')
@@ -258,6 +257,9 @@ def main():
 		if HUB_NAME not in router.name:
 			router.cmd("sysctl -w net.ipv4.ip_forward=1")
 			router.waitOutput()
+
+			if router.name == 'R2':
+				router.cmd("tcpdump -i R2-eth4 -w /tmp/R2-eth4-complete.pcap not arp > /tmp/R2-eth4-complete.out 2> /tmp/R2-eth4-complete.err &", shell=True)
 
 	log2("sysctl changes to take effect", args.sleep, col='cyan')
 
@@ -275,32 +277,24 @@ def main():
 
 	log2("BGP convergence", BGP_CONVERGENCE_TIME, 'cyan')
 
-	#os.system('lxterminal -e "/bin/bash -c \'echo --- tcpdump-atk1.out content ---; echo; tail -f /tmp/tcpdump-atk1.out\'" > /dev/null 2>&1 &')
-	#os.system('lxterminal -e "/bin/bash -c \'echo --- tcpdump-atk1.err content ---; echo; tail -f /tmp/tcpdump-atk1.err\'" > /dev/null 2>&1 &')
-	#os.system('lxterminal -e "/bin/bash -c \'echo --- tcpdump-R2-eth4.out content ---; echo; tail -f /tmp/tcpdump-R2-eth4.out\'" > /dev/null 2>&1 &')
-	#os.system('lxterminal -e "/bin/bash -c \'echo --- tcpdump-R2-eth4.err content ---; echo; tail -f /tmp/tcpdump-R2-eth4.err\'" > /dev/null 2>&1 &')
-	#os.system('lxterminal -e "/bin/bash -c \'echo --- tcpdump-R2-eth5.out content ---; echo; tail -f /tmp/tcpdump-R2-eth5.out\'" > /dev/null 2>&1 &')
-	#os.system('lxterminal -e "/bin/bash -c \'echo --- tcpdump-R2-eth5.err content ---; echo; tail -f /tmp/tcpdump-R2-eth5.err\'" > /dev/null 2>&1 &')
-
 	choice = -1
 
 	while choice != 0:
-		#choice = input("Choose:\n1) blind RST attack\n2) blind SYN attack\n3) blind UPDATE attack\n4) mininet CLI\n0) exit\n> ")
-		choice = 3
+		choice = raw_input("Choose:\n1) blind RST attack\n2) blind SYN attack\n3) blind UPDATE attack\n4) mininet CLI\n0) exit\n> ")
 
-		if 0 < choice < 4:
-			launch_attack(net, choice)
-		elif choice == 4:
-			CLI(net)
+		if choice != '':
+			choice = int(choice)
 
-		for router in net.switches:
-			if HUB_NAME not in router.name:
-				if router.name == 'R2':
-					router.cmd("tcpdump -i R2-eth4 -w /tmp/R2-eth4-blind-data-attack.pcap not arp > /tmp/tcpdump-R2-eth4.out 2> /tmp/tcpdump-R2-eth4.err &", shell=True)
-					router.cmd("tcpdump -i R2-eth5 -w /tmp/R2-eth5-blind-data-attack.pcap not arp > /tmp/tcpdump-R2-eth5.out 2> /tmp/tcpdump-R2-eth5.err &", shell=True)
+			if 0 < choice < 4:
+				launch_attack(net, choice)
 
-		#log2('letting attack take effect', 100, 'red')
-		raw_input("Press the <ENTER> to exit ..."); choice = 0
+				for router in net.switches:
+					if HUB_NAME not in router.name:
+						if router.name == 'R2':
+							router.cmd("tcpdump -i R2-eth4 -w /tmp/R2-eth4-blind-attack.pcap not arp > /tmp/tcpdump-R2-eth4.out 2> /tmp/tcpdump-R2-eth4.err &", shell=True)
+							router.cmd("tcpdump -i R2-eth5 -w /tmp/R2-eth5-blind-attack.pcap not arp > /tmp/tcpdump-R2-eth5.out 2> /tmp/tcpdump-R2-eth5.err &", shell=True)
+			elif choice == 4:
+				CLI(net)
 
 	net.stop()
 
@@ -311,9 +305,11 @@ def main():
 	os.system('pgrep pox | xargs kill -9')
 	os.system('pgrep -f webserver.py | xargs kill -9')
 
-	os.system('sudo wireshark /tmp/atk1-eth0-blind-data-attack.pcap -Y \'not ipv6\' &')
-	os.system('sudo wireshark /tmp/R2-eth4-blind-data-attack.pcap -Y \'not ipv6\' &')
-	os.system('sudo wireshark /tmp/R2-eth5-blind-data-attack.pcap -Y \'not ipv6\' &')
+	# TODO try to log R2 routing table
+
+	os.system('sudo wireshark /tmp/atk1-eth0-blind-attack.pcap -Y \'not ipv6\' &')
+	os.system('sudo wireshark /tmp/R2-eth4-blind-attack.pcap -Y \'not ipv6\' &')
+	os.system('sudo wireshark /tmp/R2-eth5-blind-attack.pcap -Y \'not ipv6\' &')
 
 
 if __name__ == "__main__":

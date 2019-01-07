@@ -1,0 +1,135 @@
+
+atk1 source MAC address aa:aa:aa:aa:aa:00
+R2 destination MAC address 22:22:22:22:22:04
+
+02:44:20.959382 IP 9.0.1.1.179 > 9.0.1.2.60927: Flags [P.], seq 2274171699:2274171718, ack 2085595468, win 57, options [nop,nop,TS val 275362 ecr 271612], length 19: BGP
+
+02:44:20.960234 IP 9.0.1.2.60927 > 9.0.1.1.179: Flags [P.], seq 2085595468:2085595487, ack 2274171718, win 58, options [nop,nop,TS val 275362 ecr 275362], length 19: BGP
+
+02:44:20.960269 IP 9.0.1.1.179 > 9.0.1.2.60927: Flags [.], ack 2085595487, win 57, options [nop,nop,TS val 275362 ecr 275362], length 0
+
+processing first row
+02:44:20.959382 IP 9.0.1.1.179 > 9.0.1.2.60927: Flags [P.], seq 2274171699:2274171718, ack 2085595468, win 57, options [nop,nop,TS val 275362 ecr 271612], length 19: BGP
+
+[ 0 ] 02:44:20.959382
+[ 1 ] IP
+[ 2 ] 9.0.1.1.179
+[ 3 ] >
+[ 4 ] 9.0.1.2.60927:
+[ 5 ] Flags
+[ 6 ] [P.],
+[ 7 ] seq
+[ 8 ] 2274171699:2274171718,
+[ 9 ] ack
+[ 10 ] 2085595468,
+[ 11 ] win
+[ 12 ] 57,
+[ 13 ] options
+[ 14 ] [nop,nop,TS
+[ 15 ] val
+[ 16 ] 275362
+[ 17 ] ecr
+[ 18 ] 271612],
+[ 19 ] length
+[ 20 ] 19:
+[ 21 ] BGP
+
+processing second row
+02:44:20.960234 IP 9.0.1.2.60927 > 9.0.1.1.179: Flags [P.], seq 2085595468:2085595487, ack 2274171718, win 58, options [nop,nop,TS val 275362 ecr 275362], length 19: BGP
+
+[ 0 ] 02:44:20.960234
+[ 1 ] IP
+[ 2 ] 9.0.1.2.60927
+[ 3 ] >
+[ 4 ] 9.0.1.1.179:
+[ 5 ] Flags
+[ 6 ] [P.],
+[ 7 ] seq
+[ 8 ] 2085595468:2085595487,
+[ 9 ] ack
+[ 10 ] 2274171718,
+[ 11 ] win
+[ 12 ] 58,
+[ 13 ] options
+[ 14 ] [nop,nop,TS
+[ 15 ] val
+[ 16 ] 275362
+[ 17 ] ecr
+[ 18 ] 275362],
+[ 19 ] length
+[ 20 ] 19:
+[ 21 ] BGP
+
+processing first row
+02:44:20.960234 IP 9.0.1.2.60927 > 9.0.1.1.179: Flags [P.], seq 2085595468:2085595487, ack 2274171718, win 58, options [nop,nop,TS val 275362 ecr 275362], length 19: BGP
+
+[ 0 ] 02:44:20.960234
+[ 1 ] IP
+[ 2 ] 9.0.1.2.60927
+[ 3 ] >
+[ 4 ] 9.0.1.1.179:
+[ 5 ] Flags
+[ 6 ] [P.],
+[ 7 ] seq
+[ 8 ] 2085595468:2085595487,
+[ 9 ] ack
+[ 10 ] 2274171718,
+[ 11 ] win
+[ 12 ] 58,
+[ 13 ] options
+[ 14 ] [nop,nop,TS
+[ 15 ] val
+[ 16 ] 275362
+[ 17 ] ecr
+[ 18 ] 275362],
+[ 19 ] length
+[ 20 ] 19:
+[ 21 ] BGP
+
+processing third row
+02:44:20.960269 IP 9.0.1.1.179 > 9.0.1.2.60927: Flags [.], ack 2085595487, win 57, options [nop,nop,TS val 275362 ecr 275362], length 0
+
+case 3
+src port 60927
+dst port 179
+seq number 2085595487
+ack number 2274171718
+window 58
+
+[31m[02:44:21] Sending TCP RST packet
+9.0.1.2:60927 -> 9.0.1.1:179 SN 2085595487 AN 2274171718[0m
+.###[ Ethernet ]###
+  dst       = 22:22:22:22:22:04
+  src       = aa:aa:aa:aa:aa:00
+  type      = 0x800
+###[ IP ]###
+     version   = 4
+     ihl       = None
+     tos       = 0x0
+     len       = None
+     id        = 1
+     flags     = 
+     frag      = 0
+     ttl       = 255
+     proto     = tcp
+     chksum    = None
+     src       = 9.0.1.2
+     dst       = 9.0.1.1
+     \options   \
+###[ TCP ]###
+        sport     = 60927
+        dport     = bgp
+        seq       = 2085595487
+        ack       = 0
+        dataofs   = None
+        reserved  = 0
+        flags     = R
+        window    = 58
+        chksum    = None
+        urgptr    = 0
+        options   = {}
+
+Sent 1 packets.
+[31m[02:44:21] Waiting 30 seconds for packets collection ...[0m
+[31m[02:44:51] Packets collected[0m
+[31m[02:44:51] Check pcap capture files[0m

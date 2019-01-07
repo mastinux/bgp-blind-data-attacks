@@ -80,12 +80,16 @@ Migrating configuration and tests from GNS3 to mininet
 	`> 0`
 
 - analyze pcap capture files  
-	`wireshark /tmp/atk1-eth0-blind-rst-attack.pcap`
-	`wireshark /tmp/R2-eth4-blind-rst-attack.pcap`  
-	`wireshark /tmp/R2-eth5-blind-rst-attack.pcap`
+	`wireshark /tmp/atk1-eth0-blind-attack.pcap`
+	`wireshark /tmp/R2-eth4-blind-attack.pcap`  
+	`wireshark /tmp/R2-eth5-blind-attack.pcap`
 
-Anche se il Sequence Number e l'Acknowledgment Number sono quelli che R2 si aspetta da R3 la sessione TCP tra i due router non viene interrotta.  
+L'attacco è stato provato sia con un pacchetto TCP con il solo flag Reset abilitato che con un pacchetto TCP con i flag Reset e Acknowledge abilitati. I risultati sono identici.
+
+- (pacchetto inviato sull'interfaccia atk1-eth0) Anche se il Sequence Number e l'Acknowledgment Number sono quelli che R2 si aspetta da R3 la sessione TCP tra i due router non viene interrotta.
 L'implementazione di BGP di Quagga non risulta affetta dalla vulnerabilità sfruttata dal Blind RST Attack.
+
+- (pacchetto inviato sull'interfaccia atk1-eth1) la sessione BGP viene interrotta e ne viene creata un'altra; è il risultato che ci aspettiamo dall'attacco.
 
 ---
 
@@ -107,11 +111,13 @@ L'implementazione di BGP di Quagga non risulta affetta dalla vulnerabilità sfru
 	`> 0`
 
 - analyze pcap capture files  
-	`wireshark /tmp/atk1-eth0-blind-syn-attack.pcap`
-	`wireshark /tmp/R2-eth4-blind-syn-attack.pcap`  
-	`wireshark /tmp/R2-eth5-blind-syn-attack.pcap`
+	`wireshark /tmp/atk1-eth0-blind-attack.pcap`
+	`wireshark /tmp/R2-eth4-blind-attack.pcap`  
+	`wireshark /tmp/R2-eth5-blind-attack.pcap`
 
-L'implementazione di Quagga reagisce secondo quanto ci si aspetta nei confronti del Blind SYN Attack.
+- (pacchetto inviato sull'interfaccia atk1-eth0) il pacchetto non influenza la sessione tra R2 ed R3.
+
+- (pacchetto inviato sull'interfaccia atk1-eth1) R3 risponde con un pacchetto di Reset; è il risultato che ci aspettiamo dall'attacco.
 
 ---
 
@@ -137,9 +143,13 @@ When the AN and the SN are in the acceptable window and also correspond to the e
 	`> 0`
 
 - analyze pcap capture files  
-	`wireshark /tmp/atk1-eth0-blind-data-attack.pcap`
-	`wireshark /tmp/R2-eth4-blind-data-attack.pcap`  
-	`wireshark /tmp/R2-eth5-blind-data-attack.pcap`
+	`wireshark /tmp/atk1-eth0-blind-attack.pcap`
+	`wireshark /tmp/R2-eth4-blind-attack.pcap`  
+	`wireshark /tmp/R2-eth5-blind-attack.pcap`
+
+- (pacchetto inviato sull'interfaccia atk1-eth0) il pacchetto non influenza la sessione tra R2 ed R3.
+
+- (pacchetto inviato sull'interfaccia atk1-eth1) la routing table di R2 viene contaminata dalla rotta contenuta nel BGP UPDATE dell'attacco, allo scadere dell'Hold Timer R2 rimuove le rotte che ha conosciuto tramite R3 e riapre una sessione con lo stesso R3, ripopolando la sua routing table; è il risultato che ci aspettiamo dall'attacco.
 
 ---
 
@@ -149,12 +159,10 @@ show quagga routing table
 
 ---
 
-*TODO* : 
-
-- ricontrollare se AN e SN sono effettivamente quelli che R2 si aspetta
-
-- capire perchè il BGP UPDATE message non influenza la routing table di R2
+*TODO*:
 
 - prova a impostare un timer più lungo
 
 - trova il modo di creare il log della routing table
+
+- capire se l'attacco deve essere eseguito da atk1-eth0 o atk1-eth1
