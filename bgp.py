@@ -209,10 +209,13 @@ def init_quagga_state_dir():
 	
 def main():
 	os.system("reset")
+
 	os.system("rm -f /tmp/bgp-R?.pid /tmp/zebra-R?.pid 2> /dev/null")
 	os.system("rm -f /tmp/R*.log /tmp/R*.pcap 2> /dev/null")
-	os.system("rm -r logs/R*stdout 2> /dev/null")
-	os.system("rm -r /tmp/hub.log /tmp/attacks.* /tmp/atk1*.pcap 2> /dev/null")
+	os.system("rm logs/R*stdout 2> /dev/null")
+	os.system("rm /tmp/hub.log /tmp/c*.log /tmp/attacks.* /tmp/atk1*.pcap 2> /dev/null")
+	os.system("rm /tmp/tcpdump*.out /tmp/tcpdump*.err 2> /dev/null")
+	os.system("rm /tmp/R*-complete.out /tmp/R*-complete.err 2> /dev/null")
 
 	os.system("mn -c > /dev/null 2>&1")
 
