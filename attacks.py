@@ -316,25 +316,19 @@ def main():
 
 	sys.stdout.flush()
 
-	"""
-	if choice == 2:
+	# DESTINATION_NETWORK = '9.0.0.0'
+	DESTINATION_NETWORK = '9.0.1.0'
+
+	# TODO understand if you have to use 
+	# atk1-eth0 (9.0.0.0)
+	# or 
+	# atk1-eth1 (9.0.1.0)
+	if DESTINATION_NETWORK == '9.0.0.0':
 		iface = 'atk1-eth0'
 	else:
-		# TEST: forcing reset on proper subnet
 		iface = 'atk1-eth1'
-		src_mac_address = 'aa:aa:aa:aa:aa:01'
+		src_mac_address = 'aa:aa:aa:aa:aa:02'
 		dst_mac_address = '22:22:22:22:22:05'
-		# RESULT
-		# for blind syn attack
-		# result is the one expected, BGP session is truncated
-		# for blind data attack
-		# TODO
-	"""
-
-	# TODO understand if you have to use atk1-eth0 or atk1-eth1
-	iface = 'atk1-eth1'
-	src_mac_address = 'aa:aa:aa:aa:aa:01'
-	dst_mac_address = '22:22:22:22:22:05'
 
 	collect_time = 0
 

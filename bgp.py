@@ -197,9 +197,6 @@ def launch_attack(net, choice):
 	os.system('lxterminal -e "/bin/bash -c \'echo --- attacks.out content ---; echo; tail -f /tmp/attacks.out\'" > /dev/null 2>&1 &')
 	os.system('lxterminal -e "/bin/bash -c \'echo --- attacks.err content ---; echo; tail -f /tmp/attacks.err\'" > /dev/null 2>&1 &')
 
-	# TODO se non trovi l'ack
-	# costruiscilo
-
 
 def init_quagga_state_dir():
 	if not os.path.exists(QUAGGA_STATE_DIR):
@@ -304,8 +301,6 @@ def main():
 	os.system('pgrep bgpd | xargs kill -9')
 	os.system('pgrep pox | xargs kill -9')
 	os.system('pgrep -f webserver.py | xargs kill -9')
-
-	# TODO try to log R2 routing table
 
 	os.system('sudo wireshark /tmp/atk1-eth0-blind-attack.pcap -Y \'not ipv6\' &')
 	os.system('sudo wireshark /tmp/R2-eth4-blind-attack.pcap -Y \'not ipv6\' &')
