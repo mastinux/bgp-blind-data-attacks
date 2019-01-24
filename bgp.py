@@ -168,31 +168,41 @@ def stopPOXHub():
 
 
 def launch_attack(net, choice):
-	log("Launching attack", 'red')
-	log("Check opened terminal", 'red')
+	log("Launching attack\nCheck opened terminal", 'red')
 
-	attacker_host = None
-	attacker_mac_address = None
+	attacker_host_eth0_mac_address = None
+	attacker_host_eth1_mac_address = None
 	r2_eth4_mac_address = None
+	r2_eth5_mac_address = None
 
-	# capturing packets on hosts
+	# retrieving attack host
 	for host in net.hosts:
 		if host.name == ATTACKER_NAME:
 			attacker_host = host
-			attacker_mac_address = host.MAC()
 
+			for i in host.intfList():
+				if 'eth0' in i.name:
+					attacker_host_eth0_mac_address = i.MAC()
+				if 'eth1' in i.name:
+					attacker_host_eth1_mac_address = i.MAC()
+
+	# retrieving R2-eth4 MAC address
 	for router in net.switches:
 		if router.name == 'R2':
 			for i in router.intfList():
 				if 'eth4' in i.name:
 					r2_eth4_mac_address = i.MAC()
+				if 'eth5' in i.name:
+					r2_eth5_mac_address = i.MAC()
 
-	assert attacker_mac_address is not None
+	assert attacker_host_eth0_mac_address is not None
+	assert attacker_host_eth1_mac_address is not None
 	assert r2_eth4_mac_address is not None
+	assert r2_eth5_mac_address is not None
 
 	# launching attack
-	attacker_host.popen("python attacks.py %s %s %s %s > /tmp/attacks.out 2> /tmp/attacks.err &" % \
-		(choice, os.getpid(), attacker_mac_address, r2_eth4_mac_address), shell=True)
+	attacker_host.popen("python attacks.py %s %s %s %s %s > /tmp/attacks.out 2> /tmp/attacks.err &" % \
+		(choice, attacker_host_eth0_mac_address, attacker_host_eth1_mac_address, r2_eth4_mac_address, r2_eth5_mac_address), shell=True)
 
 	os.system('lxterminal -e "/bin/bash -c \'echo --- attacks.out content ---; echo; tail -f /tmp/attacks.out\'" > /dev/null 2>&1 &')
 	os.system('lxterminal -e "/bin/bash -c \'echo --- attacks.err content ---; echo; tail -f /tmp/attacks.err\'" > /dev/null 2>&1 &')
@@ -245,7 +255,8 @@ def main():
 			for i in host.intfList():
 				i.setMAC(get_MAC(i.name))
 
-			host.cmd("tcpdump -i atk1-eth0 -w /tmp/atk1-eth0-blind-attack.pcap not arp > /tmp/tcpdump-atk1.out 2> /tmp/tcpdump-atk1.err &", shell=True)
+			host.cmd("tcpdump -i atk1-eth0 -w /tmp/atk1-eth0-blind-attack.pcap not arp > /tmp/tcpdump-atk1-eth0.out 2> /tmp/tcpdump-atk1-eth0.err &", shell=True)
+			host.cmd("tcpdump -i atk1-eth1 -w /tmp/atk1-eth1-blind-attack.pcap not arp > /tmp/tcpdump-atk1-eth1.out 2> /tmp/tcpdump-atk1-eth1.err &", shell=True)
 
 	for i in xrange(ASES):
 		log("Starting web server on h%s-1" % (i+1), 'yellow')
