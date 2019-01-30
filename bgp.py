@@ -167,7 +167,7 @@ def stopPOXHub():
 	os.system('pgrep -f pox.py | xargs kill -9')
 
 
-def launch_attack(net, choice):
+def launch_attack(net, choice, remote_flag):
 	log("Launching attack\nCheck opened terminal", 'red')
 
 	attacker_host_eth0_mac_address = None
@@ -201,8 +201,8 @@ def launch_attack(net, choice):
 	assert r2_eth5_mac_address is not None
 
 	# launching attack
-	attacker_host.popen("python attacks.py %s %s %s %s %s > /tmp/attacks.out 2> /tmp/attacks.err &" % \
-		(choice, attacker_host_eth0_mac_address, attacker_host_eth1_mac_address, r2_eth4_mac_address, r2_eth5_mac_address), shell=True)
+	attacker_host.popen("python attacks.py %s %s %s %s %s %s > /tmp/attacks.out 2> /tmp/attacks.err &" % \
+		(choice, remote_flag, attacker_host_eth0_mac_address, attacker_host_eth1_mac_address, r2_eth4_mac_address, r2_eth5_mac_address), shell=True)
 
 	os.system('lxterminal -e "/bin/bash -c \'echo --- attacks.out content ---; echo; tail -f /tmp/attacks.out\'" > /dev/null 2>&1 &')
 	os.system('lxterminal -e "/bin/bash -c \'echo --- attacks.err content ---; echo; tail -f /tmp/attacks.err\'" > /dev/null 2>&1 &')
@@ -297,7 +297,13 @@ def main():
 			choice = int(choice)
 
 			if 0 < choice < 4:
-				launch_attack(net, choice)
+				remote_flag = -1
+
+				while remote_flag < 0 or remote_flag > 1:
+					remote_flag = int(raw_input("Local (0) or Remote (1) attack? "))
+				
+
+				launch_attack(net, choice, remote_flag)
 
 				for router in net.switches:
 					if HUB_NAME not in router.name:
@@ -317,6 +323,7 @@ def main():
 	os.system('pgrep -f webserver.py | xargs kill -9')
 
 	os.system('sudo wireshark /tmp/atk1-eth0-blind-attack.pcap -Y \'not ipv6\' &')
+	os.system('sudo wireshark /tmp/atk1-eth1-blind-attack.pcap -Y \'not ipv6\' &')
 	os.system('sudo wireshark /tmp/R2-eth4-blind-attack.pcap -Y \'not ipv6\' &')
 	os.system('sudo wireshark /tmp/R2-eth5-blind-attack.pcap -Y \'not ipv6\' &')
 
