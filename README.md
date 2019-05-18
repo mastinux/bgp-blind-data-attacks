@@ -1,66 +1,54 @@
 # bgp-blind-data-attacks
 
-Code based on this [thesis](https://calhoun.nps.edu/handle/10945/52961)
+## Installazione VM
 
-Migrating configuration and tests from GNS3 to mininet
+Scaricare la VM Mininet [http://www.scs.stanford.edu/~jvimal/mininet-sigcomm14/mininet-tutorial-vm-64bit.zip](http://www.scs.stanford.edu/~jvimal/mininet-sigcomm14/mininet-tutorial-vm-64bit.zip).  
+Per accedere:
 
----
----
----
+- username: mininet
+- password: mininet
 
-# Tools setup
+## Preparazione mininet
 
-## Mininet setup
+- `$ git clone https://github.com/mininet/mininet`
 
-- `git clone https://github.com/mininet/mininet`
+- `$ cd mininet`
 
-- `cd mininet`
+- `$ git checkout 2.3.0d4`
 
-- `git checkout 2.3.0d4`
+- `$ ./util/install.sh -a`
 
-- `util/install.sh -a`
+- `$ mn --test pingall`
 
-- `mn --test pingall`
+- `$ mn --version`
 
-- `mn --version`
+## Quagga preparation
 
----
+Scaricare quagga-1.2.4 from [http://download.savannah.gnu.org/releases/quagga/](http://download.savannah.gnu.org/releases/quagga/) nella tua `$HOME` ed estrai il package
 
-## Quagga setup
+- `$ cd ~/quagga-1.2.4`
 
-- download quagga-1.2.4 from [here](http://download.savannah.gnu.org/releases/quagga/) in your `$HOME` and extract it
+- `# chown mininet:mininet /var/run/quagga`
 
-- `cd ~/quagga-1.2.4`
+- modifica il file `configure`, aggiungendo `${quagga_statedir_prefix}/var/run/quagga` prima di tutte le opzioni del loop su `QUAGGA_STATE_DIR` 
 
-- `mkdir /var/run/quagga-1.2.4`
+- `$ ./configure --enable-user=mininet --enable-group=mininet`
 
-- `chown mininet:mininet /var/run/quagga-1.2.4`
-
-- edit `configure` file, add `${quagga_statedir_prefix}/var/run/quagga-1.2.4` before all options in `QUAGGA_STATE_DIR` for loop 
-
-- `./configure --enable-user=mininet --enable-group=mininet`
-
-- `make`
-
----
+- `$ make`
 
 ## Contrib setup
 
-- download [bgp.py](https://github.com/levigross/Scapy/blob/master/scapy/contrib/bgp.py)
+Scaricare [https://github.com/levigross/Scapy/blob/master/scapy/contrib/bgp.py](https://github.com/levigross/Scapy/blob/master/scapy/contrib/bgp.py)
 
-- `mkdir /usr/lib/python2.7/dist-packages/scapy/contrib`
+- `$ mkdir /usr/lib/python2.7/dist-packages/scapy/contrib`
 
-- `cp bgp.py /usr/lib/python2.7/dist-packages/scapy/contrib`
+- `$ cp bgp.py /usr/lib/python2.7/dist-packages/scapy/contrib`
 
-- `touch /usr/lib/python2.7/dist-packages/scapy/contrib/__init__.py`
-
----
+- `$ touch /usr/lib/python2.7/dist-packages/scapy/contrib/__init__.py`
 
 ---
 
----
-
-# Expected results
+# Risultati attesi
 
 ## Blind RST attack
 
@@ -115,7 +103,7 @@ L'implementazione di BGP di Quagga non risulta affetta dalla vulnerabilità sfru
 	`wireshark /tmp/R2-eth4-blind-attack.pcap`  
 	`wireshark /tmp/R2-eth5-blind-attack.pcap`
 
-- attacco remoto (pacchetto inviato sull'interfaccia atk1-eth0) il pacchetto non influenza la sessione tra R2 ed R3.
+- attacco remoto (pacchetto inviato sull'interfaccia atk1-eth0) il pacchetto non disturba la sessione tra R2 ed R3.
 
 - attacco locale (pacchetto inviato sull'interfaccia atk1-eth1) R3 risponde con un pacchetto di Reset; è il risultato che ci aspettiamo dall'attacco.
 
@@ -147,18 +135,6 @@ When the AN and the SN are in the acceptable window and also correspond to the e
 	`wireshark /tmp/R2-eth4-blind-attack.pcap`  
 	`wireshark /tmp/R2-eth5-blind-attack.pcap`
 
-- attacco remoto (pacchetto inviato sull'interfaccia atk1-eth0) il pacchetto non influenza la sessione tra R2 ed R3.
+- attacco remoto (pacchetto inviato sull'interfaccia atk1-eth0) il pacchetto non disturba la sessione tra R2 ed R3.
 
 - attacco locale (pacchetto inviato sull'interfaccia atk1-eth1) la routing table di R2 viene contaminata dalla rotta contenuta nel BGP UPDATE dell'attacco, allo scadere dell'Hold Timer R2 rimuove le rotte che ha conosciuto tramite R3 e riapre una sessione con lo stesso R3, ripopolando la sua routing table; è il risultato che ci aspettiamo dall'attacco.
-
----
-
-show quagga routing table
-
-`show ip bgp`
-
----
-
-*TODO*:
-
-- prova a impostare un timer più lungo
