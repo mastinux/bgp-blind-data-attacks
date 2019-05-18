@@ -58,16 +58,16 @@ Scaricare [https://github.com/levigross/Scapy/blob/master/scapy/contrib/bgp.py](
 |**unexpected SN and SN inside window**	|challenge ACK and uninterruped session		|challenge ACK and uninterruped session|
 |**unexpected SN and SN outside window**|refused packet and uninterrupted session	|refused packet and uninterrupted session|
 
-- start topology  
+- avviare la topologia
 	`# python bgp.py`
 
-- choose attack and follow the instructions printed on the opened window
+- scegliere l'attacco `1` e seguire le istruzioni nel nuovo terminale
 	`> 1`
 
-- stop topology  
+- fermare la topologia
 	`> 0`
 
-- analyze pcap capture files  
+- analizzare i file di cattura
 	`wireshark /tmp/atk1-eth0-blind-attack.pcap`
 	`wireshark /tmp/R2-eth4-blind-attack.pcap`  
 	`wireshark /tmp/R2-eth5-blind-attack.pcap`
@@ -89,16 +89,16 @@ L'implementazione di BGP di Quagga non risulta affetta dalla vulnerabilità sfru
 |**unexpected SN and SN inside window**	|challenge ACK and uninterruped session		|challenge ACK and uninterruped session|
 |**unexpected SN and SN outside window**|challenge ACK and uninterruped session		|challenge ACK and uninterruped session|
 
-- start topology  
+- fermare la topologia
 	`# python bgp.py`
 
-- choose attack and follow the instructions printed on the opened window
+- scegliere l'attacco `2` e seguire le istruzioni nel nuovo terminale
 	`> 2`
 
-- stop topology  
+- fermare la topologia
 	`> 0`
 
-- analyze pcap capture files  
+- analizzare i file di cattura
 	`wireshark /tmp/atk1-eth0-blind-attack.pcap`
 	`wireshark /tmp/R2-eth4-blind-attack.pcap`  
 	`wireshark /tmp/R2-eth5-blind-attack.pcap`
@@ -121,16 +121,16 @@ When the AN and the SN are in the acceptable window and also correspond to the e
 |-|UPDATE or KEEPALIVE -&gt;|o|-|-|-|-|
 |o|&lt;- | ACK war | -&gt;|o|-|-|
 
-- start topology  
+- avviare la topologia
 	`# python bgp.py`
 
-- choose attack and follow the instructions printed on the opened window
-	`> 2`
+- scegliere l'attacco `3` e seguire le istruzioni nel nuovo terminale
+	`> 3`
 
-- stop topology  
+- fermare la topologia
 	`> 0`
 
-- analyze pcap capture files  
+- analizzare i file di cattura
 	`wireshark /tmp/atk1-eth0-blind-attack.pcap`
 	`wireshark /tmp/R2-eth4-blind-attack.pcap`  
 	`wireshark /tmp/R2-eth5-blind-attack.pcap`
