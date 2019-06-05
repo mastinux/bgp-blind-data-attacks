@@ -266,6 +266,11 @@ def main():
 	for router in net.switches:
 
 		if HUB_NAME not in router.name:
+			# 0 = no RPF
+			# 1 = RPF strict mode
+			# 2 = RPF loose mode
+			router.cmd("sysctl -w net.ipv4.conf.all.rp_filter=2")
+
 			router.cmd("sysctl -w net.ipv4.ip_forward=1")
 			router.waitOutput()
 
@@ -297,11 +302,10 @@ def main():
 			choice = int(choice)
 
 			if 0 < choice < 4:
-				remote_flag = -1
-
-				while remote_flag < 0 or remote_flag > 1:
-					remote_flag = int(raw_input("Local (0) or Remote (1) attack? "))
-				
+				#remote_flag = -1
+				#while remote_flag < 0 or remote_flag > 1:
+				#	remote_flag = int(raw_input("Local (0) or Remote (1) attack? "))
+				remote_flag = 1
 
 				launch_attack(net, choice, remote_flag)
 
@@ -322,8 +326,8 @@ def main():
 	os.system('pgrep pox | xargs kill -9')
 	os.system('pgrep -f webserver.py | xargs kill -9')
 
-	os.system('sudo wireshark /tmp/atk1-eth0-blind-attack.pcap -Y \'not ipv6\' &')
-	os.system('sudo wireshark /tmp/atk1-eth1-blind-attack.pcap -Y \'not ipv6\' &')
+	# os.system('sudo wireshark /tmp/atk1-eth0-blind-attack.pcap -Y \'not ipv6\' &')
+	# os.system('sudo wireshark /tmp/atk1-eth1-blind-attack.pcap -Y \'not ipv6\' &')
 	os.system('sudo wireshark /tmp/R2-eth4-blind-attack.pcap -Y \'not ipv6\' &')
 	os.system('sudo wireshark /tmp/R2-eth5-blind-attack.pcap -Y \'not ipv6\' &')
 

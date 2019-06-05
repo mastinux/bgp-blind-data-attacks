@@ -344,9 +344,13 @@ def main():
 		send_update_packet(iface, src_mac_address, dst_mac_address, SOURCE_ADDRESS, srcPort, DESTINATION_ADDRESS, dstPort, seqNum, ackNum, win)
 		collect_time = BLIND_DATA_ATTACK_COLLECT_TIME
 
+	log('Close "attacks.err content" terminal', 'red')
 	log2('packets collection', collect_time, 'red')
+
 	log('Packets collected', 'red')
-	log('Check pcap capture files', 'red')
+	log('After closing this terminal', 'red')
+	log('select 0 on main menu', 'red')
+	log('and check opened pcap capture files', 'red')
 
 
 if __name__ == "__main__":
